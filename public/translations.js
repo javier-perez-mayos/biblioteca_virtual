@@ -174,7 +174,31 @@ const translations = {
     loginRequiredMessage: 'Please login or register to access the library',
     loginToAccess: 'Login to Access Library',
     capture: '📸 Capture',
-    uploadingAnalyzing: 'Uploading and analyzing image...'
+    uploadingAnalyzing: 'Uploading and analyzing image...',
+
+    // Admin panel
+    adminPanel: 'Admin Panel',
+    manageUsers: 'Manage Users',
+    manageBooks: 'Manage Books',
+    allUsers: 'All Users',
+    allBooks: 'All Books',
+    userStatus: 'Status',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    enableUser: 'Enable',
+    disableUser: 'Disable',
+    administrator: 'Administrator',
+    editBookDetails: 'Edit Book Details',
+    updateCover: 'Update Cover',
+    forceBorrow: 'Force Borrow',
+    forceReturn: 'Force Return',
+    selectUser: 'Select User',
+    borrowTo: 'Borrow to',
+    confirmForceBorrow: 'Force this book to be borrowed by the selected user?',
+    confirmForceReturn: 'Force return this book?',
+    bookUpdated: 'Book updated successfully',
+    coverUpdated: 'Cover updated successfully',
+    editBook: 'Edit Book'
   },
 
   de: {
@@ -352,7 +376,31 @@ const translations = {
     loginRequiredMessage: 'Bitte melden Sie sich an oder registrieren Sie sich, um auf die Bibliothek zuzugreifen',
     loginToAccess: 'Anmelden, um auf Bibliothek zuzugreifen',
     capture: '📸 Aufnehmen',
-    uploadingAnalyzing: 'Hochladen und Analysieren des Bildes...'
+    uploadingAnalyzing: 'Hochladen und Analysieren des Bildes...',
+
+    // Admin panel
+    adminPanel: 'Administratorpanel',
+    manageUsers: 'Benutzer verwalten',
+    manageBooks: 'Bücher verwalten',
+    allUsers: 'Alle Benutzer',
+    allBooks: 'Alle Bücher',
+    userStatus: 'Status',
+    enabled: 'Aktiviert',
+    disabled: 'Deaktiviert',
+    enableUser: 'Aktivieren',
+    disableUser: 'Deaktivieren',
+    administrator: 'Administrator',
+    editBookDetails: 'Buchdetails bearbeiten',
+    updateCover: 'Cover aktualisieren',
+    forceBorrow: 'Ausleihe erzwingen',
+    forceReturn: 'Rückgabe erzwingen',
+    selectUser: 'Benutzer auswählen',
+    borrowTo: 'Ausleihen an',
+    confirmForceBorrow: 'Möchten Sie dieses Buch dem ausgewählten Benutzer zuweisen?',
+    confirmForceReturn: 'Möchten Sie die Rückgabe dieses Buches erzwingen?',
+    bookUpdated: 'Buch erfolgreich aktualisiert',
+    coverUpdated: 'Cover erfolgreich aktualisiert',
+    editBook: 'Buch bearbeiten'
   },
 
   ca: {
@@ -530,7 +578,31 @@ const translations = {
     loginRequiredMessage: 'Si us plau, inicieu sessió o registreu-vos per accedir a la biblioteca',
     loginToAccess: 'Iniciar Sessió per Accedir a la Biblioteca',
     capture: '📸 Capturar',
-    uploadingAnalyzing: 'Pujant i analitzant imatge...'
+    uploadingAnalyzing: 'Pujant i analitzant imatge...',
+
+    // Admin panel
+    adminPanel: 'Panell d\'Administrador',
+    manageUsers: 'Gestionar Usuaris',
+    manageBooks: 'Gestionar Llibres',
+    allUsers: 'Tots els Usuaris',
+    allBooks: 'Tots els Llibres',
+    userStatus: 'Estat',
+    enabled: 'Activat',
+    disabled: 'Desactivat',
+    enableUser: 'Activar',
+    disableUser: 'Desactivar',
+    administrator: 'Administrador',
+    editBookDetails: 'Editar Detalls del Llibre',
+    updateCover: 'Actualitzar Portada',
+    forceBorrow: 'Forçar Préstec',
+    forceReturn: 'Forçar Retorn',
+    selectUser: 'Seleccionar Usuari',
+    borrowTo: 'Prestar a',
+    confirmForceBorrow: 'Voleu forçar el préstec d\'aquest llibre a l\'usuari seleccionat?',
+    confirmForceReturn: 'Voleu forçar el retorn d\'aquest llibre?',
+    bookUpdated: 'Llibre actualitzat correctament',
+    coverUpdated: 'Portada actualitzada correctament',
+    editBook: 'Editar Llibre'
   }
 };
 

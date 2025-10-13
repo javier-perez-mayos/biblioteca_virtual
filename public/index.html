@@ -68,6 +68,7 @@
                 <a href="#" id="profileLink" data-i18n="profile">El Meu Perfil</a>
                 <a href="#" id="myBooksLink" data-i18n="myBooks">Els Meus Llibres</a>
                 <a href="#" id="borrowedBooksLink" data-i18n="borrowedBooks">Llibres Prestats</a>
+                <a href="#" id="adminPanelLink" style="display: none;" data-i18n="adminPanel">Panell d'Administrador</a>
                 <hr />
                 <a href="#" id="logoutLink" data-i18n="logout">Tancar Sessió</a>
               </div>
@@ -421,6 +422,113 @@
     </div>
   </div>
 
+  <!-- Admin Panel Modal -->
+  <div id="adminModal" class="modal">
+    <div class="modal-content modal-large" style="max-width: 1200px;">
+      <div class="modal-header">
+        <h2 data-i18n="adminPanel">Panell d'Administrador</h2>
+        <button class="close-btn" onclick="closeAdminModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Admin Tabs -->
+        <div class="profile-tabs">
+          <button class="tab-btn active" data-tab="admin-users" data-i18n="manageUsers">Gestionar Usuaris</button>
+          <button class="tab-btn" data-tab="admin-books" data-i18n="manageBooks">Gestionar Llibres</button>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="tab-admin-users" class="tab-content active">
+          <h3 data-i18n="allUsers">Tots els Usuaris</h3>
+          <div id="adminUsersList" class="admin-users-list"></div>
+        </div>
+
+        <!-- Books Tab -->
+        <div id="tab-admin-books" class="tab-content">
+          <h3 data-i18n="allBooks">Tots els Llibres</h3>
+          <div id="adminBooksList" class="books-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Book Modal -->
+  <div id="editBookModal" class="modal">
+    <div class="modal-content modal-large">
+      <div class="modal-header">
+        <h2 data-i18n="editBook">Editar Llibre</h2>
+        <button class="close-btn" onclick="closeEditBookModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="editBookForm">
+          <input type="hidden" id="editBookId" />
+
+          <div class="form-preview">
+            <img id="editBookCoverPreview" src="" alt="Cover" style="max-width: 200px; max-height: 300px;" />
+            <div style="margin-top: 1rem;">
+              <input type="file" id="editBookCoverInput" accept="image/*" style="display: none;" />
+              <button type="button" class="btn-secondary" onclick="document.getElementById('editBookCoverInput').click()" data-i18n="updateCover">Actualitzar Portada</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editBookTitle"><span data-i18n="title">Títol</span> *</label>
+            <input type="text" id="editBookTitle" required />
+          </div>
+
+          <div class="form-group">
+            <label for="editBookAuthor" data-i18n="author">Autor</label>
+            <input type="text" id="editBookAuthor" />
+          </div>
+
+          <div class="form-group">
+            <label for="editBookISBN" data-i18n="isbn">ISBN</label>
+            <input type="text" id="editBookISBN" />
+          </div>
+
+          <div class="form-group">
+            <label for="editBookPublisher" data-i18n="publisher">Editorial</label>
+            <input type="text" id="editBookPublisher" />
+          </div>
+
+          <div class="form-group">
+            <label for="editBookPublishedDate" data-i18n="publishedDate">Data de Publicació</label>
+            <input type="text" id="editBookPublishedDate" placeholder="YYYY-MM-DD" />
+          </div>
+
+          <div class="form-group">
+            <label for="editBookDescription" data-i18n="description">Descripció</label>
+            <textarea id="editBookDescription" rows="4"></textarea>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="editBookPages" data-i18n="pageCount">Pàgines</label>
+              <input type="number" id="editBookPages" />
+            </div>
+
+            <div class="form-group">
+              <label for="editBookLanguage" data-i18n="language">Idioma</label>
+              <input type="text" id="editBookLanguage" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editBookCategories" data-i18n="categories">Categories</label>
+            <input type="text" id="editBookCategories" />
+          </div>
+
+          <div id="editBookStatus" class="status-message" style="display: none;"></div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" onclick="closeEditBookModal()" data-i18n="cancel">Cancel·lar</button>
+            <button type="submit" class="btn-primary" data-i18n="saveBook">Desar Llibre</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

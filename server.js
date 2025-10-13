@@ -888,6 +888,133 @@ app.put('/api/admin/books/:id/borrower', requireAdmin, [
   }
 });
 
+/**
+ * PUT /api/admin/books/:id/cover - Update book cover (admin only)
+ */
+app.put('/api/admin/books/:id/cover', requireAdmin, upload.single('cover'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    const bookId = req.params.id;
+    const coverPath = `/uploads/${req.file.filename}`;
+
+    // Optimize image
+    const optimizedPath = path.join(UPLOAD_DIR, 'opt-' + req.file.filename);
+    await sharp(req.file.path)
+      .resize(800, null, { withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toFile(optimizedPath);
+
+    // Update book cover in database
+    await db.updateBook(bookId, {
+      cover_image: `/uploads/opt-${req.file.filename}`,
+      thumbnail_image: coverPath
+    });
+
+    const updatedBook = await db.getBookById(bookId);
+
+    res.json({
+      success: true,
+      data: updatedBook,
+      message: 'Cover updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating cover:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/books/:id - Update book details (owner only)
+ */
+app.put('/api/books/:id', requireAuth, async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const book = await db.getBookById(bookId);
+
+    if (!book) {
+      return res.status(404).json({ success: false, error: 'Book not found' });
+    }
+
+    // Check if user is owner
+    if (book.added_by_user_id !== req.userId) {
+      return res.status(403).json({ success: false, error: 'Only book owner can edit' });
+    }
+
+    await db.updateBook(bookId, req.body);
+    const updatedBook = await db.getBookById(bookId);
+
+    res.json({
+      success: true,
+      data: updatedBook,
+      message: 'Book updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating book:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/books/:id/cover - Update book cover (owner only)
+ */
+app.put('/api/books/:id/cover', requireAuth, upload.single('cover'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    const bookId = req.params.id;
+    const book = await db.getBookById(bookId);
+
+    if (!book) {
+      return res.status(404).json({ success: false, error: 'Book not found' });
+    }
+
+    // Check if user is owner
+    if (book.added_by_user_id !== req.userId) {
+      return res.status(403).json({ success: false, error: 'Only book owner can update cover' });
+    }
+
+    const coverPath = `/uploads/${req.file.filename}`;
+
+    // Optimize image
+    const optimizedPath = path.join(UPLOAD_DIR, 'opt-' + req.file.filename);
+    await sharp(req.file.path)
+      .resize(800, null, { withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toFile(optimizedPath);
+
+    // Update book cover in database
+    await db.updateBook(bookId, {
+      cover_image: `/uploads/opt-${req.file.filename}`,
+      thumbnail_image: coverPath
+    });
+
+    const updatedBook = await db.getBookById(bookId);
+
+    res.json({
+      success: true,
+      data: updatedBook,
+      message: 'Cover updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating cover:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);

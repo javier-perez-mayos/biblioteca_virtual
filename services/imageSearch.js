@@ -34,68 +34,83 @@ class ImageSearchService {
   }
 
   /**
-   * Upload image to Google and perform reverse image search
+   * Upload image to Google Lens and perform reverse image search
    */
   async reverseImageSearch(imagePath) {
     try {
-      console.log('Starting Google reverse image search...');
+      console.log('Starting Google Lens reverse image search...');
       const browser = await this.initBrowser();
       const page = await browser.newPage();
 
       // Set user agent to avoid detection
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-      // Navigate to Google Images
-      await page.goto('https://images.google.com/', { waitUntil: 'networkidle2' });
+      // Read image and convert to base64
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64Image = imageBuffer.toString('base64');
+      const mimeType = imagePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-      // Click on camera icon for image search
+      // Use Google Lens upload endpoint directly
+      console.log('Uploading image to Google Lens...');
+      await page.goto('https://lens.google.com/upload', { waitUntil: 'networkidle0', timeout: 30000 });
+
+      // Wait for file input to appear
+      await page.waitForSelector('input[type="file"]', { timeout: 10000 });
+
+      // Upload the image file
+      const fileInput = await page.$('input[type="file"]');
+      await fileInput.uploadFile(imagePath);
+
+      // Wait for results to load - Google Lens may take time to process
+      console.log('Waiting for Lens results...');
+      await page.waitForTimeout(5000);
+
+      // Try to wait for specific result elements
       try {
-        await page.waitForSelector('div[aria-label*="Search by image"]', { timeout: 5000 });
-        await page.click('div[aria-label*="Search by image"]');
+        await page.waitForSelector('a[href*="amazon"], a[href*="goodreads"], [class*="result"], [class*="product"]', { timeout: 10000 });
       } catch (e) {
-        console.log('Trying alternative selector for image search button...');
-        await page.click('[aria-label="Search by image"]');
+        console.log('No specific result selectors found, proceeding with page scraping...');
       }
 
-      // Wait for upload tab
-      await page.waitForSelector('input[type="file"]', { timeout: 5000 });
+      // Take a screenshot for debugging if needed
+      // await page.screenshot({ path: 'debug-lens.png', fullPage: true });
 
-      // Upload the image
-      const input = await page.$('input[type="file"]');
-      await input.uploadFile(imagePath);
-
-      // Wait for results to load
-      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
-
-      // Extract search results
+      // Extract search results from Google Lens
       const results = await page.evaluate(() => {
         const data = {
           bestGuess: '',
           titles: [],
           links: [],
           amazonLinks: [],
-          goodreadsLinks: []
+          goodreadsLinks: [],
+          textContent: document.body.textContent
         };
 
-        // Get "best guess" label
-        const bestGuessElement = document.querySelector('input[name="q"]');
-        if (bestGuessElement) {
-          data.bestGuess = bestGuessElement.value;
+        // Try to find the main title/best guess in various places
+        const titleSelectors = [
+          'h1', 'h2', '[class*="title"]', '[class*="heading"]',
+          '[data-text-content]', '[class*="product-title"]'
+        ];
+
+        for (const selector of titleSelectors) {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(el => {
+            const text = el.textContent.trim();
+            if (text && text.length > 5 && text.length < 200 && !data.titles.includes(text)) {
+              data.titles.push(text);
+            }
+          });
         }
 
-        // Alternative best guess selectors
-        if (!data.bestGuess) {
-          const altGuess = document.querySelector('a.fKDtNb');
-          if (altGuess) {
-            data.bestGuess = altGuess.textContent.trim();
-          }
+        // Set best guess from first title
+        if (data.titles.length > 0) {
+          data.bestGuess = data.titles[0];
         }
 
-        // Get all search result links
+        // Get all links
         const linkElements = document.querySelectorAll('a[href]');
         linkElements.forEach(link => {
           const href = link.href;
-          const text = link.textContent.trim();
 
           if (href.includes('amazon.') && !data.amazonLinks.includes(href)) {
             data.amazonLinks.push(href);
@@ -103,12 +118,10 @@ class ImageSearchService {
             data.goodreadsLinks.push(href);
           }
 
-          if (text && text.length > 10 && text.length < 200) {
-            data.titles.push(text);
-          }
-
-          if (href && !href.includes('google.com')) {
-            data.links.push(href);
+          if (href && !href.includes('google.com') && !href.includes('lens.google')) {
+            if (!data.links.includes(href)) {
+              data.links.push(href);
+            }
           }
         });
 
@@ -117,9 +130,28 @@ class ImageSearchService {
 
       console.log('Reverse image search results:', {
         bestGuess: results.bestGuess,
+        titlesFound: results.titles.length,
         amazonLinksFound: results.amazonLinks.length,
-        goodreadsLinksFound: results.goodreadsLinks.length
+        goodreadsLinksFound: results.goodreadsLinks.length,
+        totalLinks: results.links.length
       });
+
+      // If no results from Lens, try extracting from text content
+      if (!results.bestGuess && results.textContent) {
+        // Look for book patterns in text
+        const bookPatterns = [
+          /(?:book|title)[:]\s*([^,\n]+)/i,
+          /by\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/
+        ];
+
+        for (const pattern of bookPatterns) {
+          const match = results.textContent.match(pattern);
+          if (match && match[1]) {
+            results.bestGuess = match[1].trim();
+            break;
+          }
+        }
+      }
 
       return results;
     } catch (error) {

@@ -1,7 +1,8 @@
 const translations = {
   en: {
     // Header
-    appTitle: 'Virtual Library',
+    appTitle: 'Petita Escola Library',
+    appDescription: 'Welcome to the virtual library of Petita Escola Munich!',
     search: 'Search books...',
     searchButton: 'Search',
     login: 'Login',
@@ -131,7 +132,8 @@ const translations = {
 
   de: {
     // Header
-    appTitle: 'Virtuelle Bibliothek',
+    appTitle: 'Petita Escola Bibliothek',
+    appDescription: 'Willkommen in der virtuellen Bibliothek der Petita Escola München!',
     search: 'Bücher suchen...',
     searchButton: 'Suchen',
     login: 'Anmelden',
@@ -261,7 +263,8 @@ const translations = {
 
   ca: {
     // Header
-    appTitle: 'Biblioteca Virtual',
+    appTitle: 'Biblioteca de la Petita Escola',
+    appDescription: 'Benvingudes a la biblioteca virtual de la Petita Escola de Munic!',
     search: 'Cercar llibres...',
     searchButton: 'Cercar',
     login: 'Iniciar Sessió',

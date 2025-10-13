@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Biblioteca Virtual</title>
+  <title>Biblioteca de la Petita Escola</title>
+  <link rel="icon" type="image/jpeg" href="/book-icon.jpg">
   <link rel="stylesheet" href="/styles.css">
   <script src="/flags.js"></script>
   <script src="/translations.js"></script>
@@ -13,7 +14,13 @@
     <!-- Header -->
     <header class="header">
       <div class="container">
-        <h1 class="logo" onclick="window.location.reload()"><span data-i18n="appTitle">📚 Biblioteca Virtual</span></h1>
+        <div class="logo-section" onclick="window.location.reload()" style="cursor: pointer;">
+          <img src="/book-icon.jpg" alt="Logo" class="logo-image" />
+          <div class="logo-text">
+            <h1 class="logo-title" data-i18n="appTitle">Biblioteca de la Petita Escola</h1>
+            <p class="logo-subtitle" data-i18n="appDescription">Benvingudes a la biblioteca virtual de la Petita Escola de Munic!</p>
+          </div>
+        </div>
         <div class="header-actions">
           <!-- Language Selector -->
           <div class="language-selector">

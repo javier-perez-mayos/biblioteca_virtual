@@ -90,6 +90,17 @@
     <!-- Main Content -->
     <main class="main-content">
       <div class="container">
+        <!-- Login Required State -->
+        <div id="loginRequiredState" class="empty-state" style="display: none;">
+          <div class="empty-icon">🔒</div>
+          <h2 data-i18n="loginRequiredTitle">Cal iniciar sessió</h2>
+          <p data-i18n="loginRequiredMessage">Si us plau, inicieu sessió o registreu-vos per accedir a la biblioteca</p>
+          <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
+            <button class="btn-primary" onclick="openLoginModal()" data-i18n="login">Iniciar Sessió</button>
+            <button class="btn-secondary" onclick="openRegisterModal()" data-i18n="register">Registrar-se</button>
+          </div>
+        </div>
+
         <!-- Loading State -->
         <div id="loadingState" class="loading-state" style="display: none;">
           <div class="spinner"></div>

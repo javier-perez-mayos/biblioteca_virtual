@@ -167,7 +167,10 @@ const translations = {
     loadingBooksEllipsis: 'Loading books...',
     noBooksYet: 'You haven\'t added any books yet',
     loadingBorrowedBooks: 'Loading borrowed books...',
-    noBorrowedCurrently: 'You don\'t have any books borrowed currently'
+    noBorrowedCurrently: 'You don\'t have any books borrowed currently',
+    loginRequiredTitle: 'Login Required',
+    loginRequiredMessage: 'Please login or register to access the library',
+    loginToAccess: 'Login to Access Library'
   },
 
   de: {
@@ -338,7 +341,10 @@ const translations = {
     loadingBooksEllipsis: 'Bücher werden geladen...',
     noBooksYet: 'Sie haben noch keine Bücher hinzugefügt',
     loadingBorrowedBooks: 'Ausgeliehene Bücher werden geladen...',
-    noBorrowedCurrently: 'Sie haben derzeit keine Bücher ausgeliehen'
+    noBorrowedCurrently: 'Sie haben derzeit keine Bücher ausgeliehen',
+    loginRequiredTitle: 'Anmeldung erforderlich',
+    loginRequiredMessage: 'Bitte melden Sie sich an oder registrieren Sie sich, um auf die Bibliothek zuzugreifen',
+    loginToAccess: 'Anmelden, um auf Bibliothek zuzugreifen'
   },
 
   ca: {
@@ -509,7 +515,10 @@ const translations = {
     loadingBooksEllipsis: 'Carregant llibres...',
     noBooksYet: 'No has afegit cap llibre encara',
     loadingBorrowedBooks: 'Carregant llibres prestats...',
-    noBorrowedCurrently: 'No tens cap llibre prestat actualment'
+    noBorrowedCurrently: 'No tens cap llibre prestat actualment',
+    loginRequiredTitle: 'Cal iniciar sessió',
+    loginRequiredMessage: 'Si us plau, inicieu sessió o registreu-vos per accedir a la biblioteca',
+    loginToAccess: 'Iniciar Sessió per Accedir a la Biblioteca'
   }
 };
 

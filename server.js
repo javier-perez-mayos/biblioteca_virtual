@@ -336,7 +336,7 @@ app.get('/api/auth/my-books', requireAuth, async (req, res) => {
 /**
  * GET /api/books - Get all books
  */
-app.get('/api/books', async (req, res) => {
+app.get('/api/books', requireAuth, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;
     const offset = parseInt(req.query.offset) || 0;
@@ -351,7 +351,7 @@ app.get('/api/books', async (req, res) => {
 /**
  * GET /api/books/search - Search books
  */
-app.get('/api/books/search', async (req, res) => {
+app.get('/api/books/search', requireAuth, async (req, res) => {
   try {
     const query = req.query.q;
     if (!query) {
@@ -369,7 +369,7 @@ app.get('/api/books/search', async (req, res) => {
 /**
  * GET /api/books/:id - Get book by ID
  */
-app.get('/api/books/:id', async (req, res) => {
+app.get('/api/books/:id', requireAuth, async (req, res) => {
   try {
     const book = await db.getBookById(req.params.id);
     if (book) {
@@ -596,7 +596,7 @@ app.post('/api/books/complete', async (req, res) => {
 /**
  * GET /api/stats - Get library statistics
  */
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', requireAuth, async (req, res) => {
   try {
     const totalBooks = await db.getBooksCount();
     res.json({

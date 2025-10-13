@@ -157,19 +157,22 @@ async function checkAuthStatus() {
       const result = await response.json();
       currentUser = result.data;
       updateUIForAuth(true);
+      // Load books only if authenticated
+      loadBooks();
+      loadStats();
     } else {
       currentUser = null;
       updateUIForAuth(false);
+      // Show login required state
+      showLoginRequired();
     }
   } catch (error) {
     console.error('Auth check error:', error);
     currentUser = null;
     updateUIForAuth(false);
+    // Show login required state
+    showLoginRequired();
   }
-
-  // Load books after auth check
-  loadBooks();
-  loadStats();
 }
 
 function updateUIForAuth(isAuthenticated) {
@@ -659,13 +662,28 @@ async function loadStats() {
   }
 }
 
+// Show login required state
+function showLoginRequired() {
+  const loginRequiredState = document.getElementById('loginRequiredState');
+  const loadingState = document.getElementById('loadingState');
+  const emptyState = document.getElementById('emptyState');
+  const grid = document.getElementById('booksGrid');
+
+  loadingState.style.display = 'none';
+  emptyState.style.display = 'none';
+  grid.style.display = 'none';
+  loginRequiredState.style.display = 'block';
+}
+
 // Render books grid
 function renderBooks(books) {
   const grid = document.getElementById('booksGrid');
   const loadingState = document.getElementById('loadingState');
   const emptyState = document.getElementById('emptyState');
+  const loginRequiredState = document.getElementById('loginRequiredState');
 
   loadingState.style.display = 'none';
+  loginRequiredState.style.display = 'none';
 
   if (books.length === 0) {
     grid.style.display = 'none';

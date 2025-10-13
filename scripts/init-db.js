@@ -29,6 +29,8 @@ db.serialize(() => {
       postal_address TEXT NOT NULL,
       telephone TEXT NOT NULL,
       profile_picture TEXT,
+      is_admin INTEGER DEFAULT 0,
+      is_enabled INTEGER DEFAULT 1,
       created_date DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `, (err) => {

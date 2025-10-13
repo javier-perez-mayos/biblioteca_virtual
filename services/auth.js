@@ -69,6 +69,12 @@ class AuthService {
             return;
           }
 
+          // Check if user is enabled
+          if (user.is_enabled === 0) {
+            reject(new Error('User account is disabled'));
+            return;
+          }
+
           // Compare password
           const validPassword = await bcrypt.compare(password, user.password);
 
@@ -92,7 +98,7 @@ class AuthService {
    */
   async getUserById(userId) {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT id, name, email, postal_address, telephone, profile_picture, created_date FROM users WHERE id = ?';
+      const sql = 'SELECT id, name, email, postal_address, telephone, profile_picture, is_admin, is_enabled, created_date FROM users WHERE id = ?';
 
       db.db.get(sql, [userId], (err, user) => {
         if (err) {
@@ -209,6 +215,40 @@ class AuthService {
       } catch (error) {
         reject(error);
       }
+    });
+  }
+
+  /**
+   * Get all users (admin only)
+   */
+  async getAllUsers() {
+    return new Promise((resolve, reject) => {
+      const sql = 'SELECT id, name, email, postal_address, telephone, profile_picture, is_admin, is_enabled, created_date FROM users ORDER BY created_date DESC';
+
+      db.db.all(sql, [], (err, users) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(users);
+        }
+      });
+    });
+  }
+
+  /**
+   * Enable or disable a user (admin only)
+   */
+  async toggleUserStatus(userId, isEnabled) {
+    return new Promise((resolve, reject) => {
+      const sql = 'UPDATE users SET is_enabled = ? WHERE id = ?';
+
+      db.db.run(sql, [isEnabled ? 1 : 0, userId], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ success: true, changes: this.changes });
+        }
+      });
     });
   }
 }

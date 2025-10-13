@@ -11,7 +11,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('./services/database');
 const bookRecognition = require('./services/bookRecognition');
 const authService = require('./services/auth');
-const { requireAuth, attachUser } = require('./middleware/auth');
+const { requireAuth, requireAdmin, attachUser } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -140,6 +140,7 @@ app.post('/api/auth/login', [
     // Set session
     req.session.userId = user.id;
     req.session.userName = user.name;
+    req.session.isAdmin = user.is_admin === 1;
 
     res.json({
       success: true,
@@ -706,6 +707,180 @@ app.get('/api/books/:id/borrowings', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching book borrowings:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * ============================================================================
+ * ADMIN ROUTES
+ * ============================================================================
+ */
+
+/**
+ * GET /api/admin/users - Get all users (admin only)
+ */
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const users = await authService.getAllUsers();
+
+    res.json({
+      success: true,
+      data: users
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/users/:id/toggle-status - Enable/Disable user (admin only)
+ */
+app.put('/api/admin/users/:id/toggle-status', requireAdmin, async (req, res) => {
+  try {
+    const { is_enabled } = req.body;
+
+    if (is_enabled === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'is_enabled field is required'
+      });
+    }
+
+    // Prevent admin from disabling themselves
+    if (parseInt(req.params.id) === req.userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot disable your own account'
+      });
+    }
+
+    await authService.toggleUserStatus(req.params.id, is_enabled);
+
+    res.json({
+      success: true,
+      message: `User ${is_enabled ? 'enabled' : 'disabled'} successfully`
+    });
+  } catch (error) {
+    console.error('Error toggling user status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/admin/books - Get all books (admin only)
+ */
+app.get('/api/admin/books', requireAdmin, async (req, res) => {
+  try {
+    const books = await db.getAllBooks();
+
+    res.json({
+      success: true,
+      data: books
+    });
+  } catch (error) {
+    console.error('Error fetching books:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/books/:id - Update book details (admin only)
+ */
+app.put('/api/admin/books/:id', requireAdmin, async (req, res) => {
+  try {
+    const bookId = req.params.id;
+    const bookData = req.body;
+
+    await db.updateBook(bookId, bookData);
+
+    // Fetch updated book
+    const updatedBook = await db.getBookById(bookId);
+
+    res.json({
+      success: true,
+      data: updatedBook,
+      message: 'Book updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating book:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/books/:id/owner - Change book owner (admin only)
+ */
+app.put('/api/admin/books/:id/owner', requireAdmin, [
+  body('new_owner_id').isInt().withMessage('Valid user ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { new_owner_id } = req.body;
+
+    await db.changeBookOwner(req.params.id, new_owner_id);
+
+    res.json({
+      success: true,
+      message: 'Book owner changed successfully'
+    });
+  } catch (error) {
+    console.error('Error changing book owner:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/admin/books/:id/borrower - Change book borrower (admin only)
+ */
+app.put('/api/admin/books/:id/borrower', requireAdmin, [
+  body('new_borrower_id').isInt().withMessage('Valid user ID is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { new_borrower_id } = req.body;
+
+    await db.changeBookBorrower(req.params.id, new_borrower_id);
+
+    res.json({
+      success: true,
+      message: 'Book borrower changed successfully'
+    });
+  } catch (error) {
+    console.error('Error changing book borrower:', error);
     res.status(500).json({
       success: false,
       error: error.message

@@ -434,6 +434,97 @@ class DatabaseService {
     });
   }
 
+  /**
+   * Update book details (admin only)
+   */
+  updateBook(bookId, bookData) {
+    return new Promise((resolve, reject) => {
+      const fields = [];
+      const params = [];
+
+      const allowedFields = ['title', 'author', 'isbn', 'publisher', 'published_date',
+                             'description', 'page_count', 'categories', 'language',
+                             'status', 'added_by_user_id'];
+
+      allowedFields.forEach(field => {
+        if (bookData[field] !== undefined) {
+          fields.push(`${field} = ?`);
+          params.push(bookData[field]);
+        }
+      });
+
+      if (fields.length === 0) {
+        return resolve({ id: bookId, changes: 0 });
+      }
+
+      params.push(bookId);
+      const sql = `UPDATE books SET ${fields.join(', ')} WHERE id = ?`;
+
+      this.db.run(sql, params, function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ id: bookId, changes: this.changes });
+        }
+      });
+    });
+  }
+
+  /**
+   * Change book owner (admin only)
+   */
+  changeBookOwner(bookId, newOwnerId) {
+    return new Promise((resolve, reject) => {
+      const sql = 'UPDATE books SET added_by_user_id = ? WHERE id = ?';
+
+      this.db.run(sql, [newOwnerId, bookId], function(err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve({ success: true, changes: this.changes });
+        }
+      });
+    });
+  }
+
+  /**
+   * Change book borrower (admin only) - transfers active borrowing to another user
+   */
+  changeBookBorrower(bookId, newBorrowerId) {
+    return new Promise((resolve, reject) => {
+      // Find active borrowing record
+      const findSql = `
+        SELECT id FROM borrowing_records
+        WHERE book_id = ? AND status = 'borrowed'
+        ORDER BY borrow_date DESC
+        LIMIT 1
+      `;
+
+      this.db.get(findSql, [bookId], (err, record) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        if (!record) {
+          reject(new Error('Book is not currently borrowed'));
+          return;
+        }
+
+        // Update the borrower
+        const updateSql = 'UPDATE borrowing_records SET user_id = ? WHERE id = ?';
+
+        this.db.run(updateSql, [newBorrowerId, record.id], function(err) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve({ success: true, changes: this.changes });
+          }
+        });
+      });
+    });
+  }
+
   close() {
     if (this.db) {
       this.db.close((err) => {

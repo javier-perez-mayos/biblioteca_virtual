@@ -370,6 +370,12 @@ async function handleEditBookCoverUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
+  // Show uploading message
+  const statusEl = document.getElementById('editBookStatus');
+  statusEl.textContent = t('uploading');
+  statusEl.className = 'status-message';
+  statusEl.style.display = 'block';
+
   const formData = new FormData();
   formData.append('cover', file);
 
@@ -380,6 +386,8 @@ async function handleEditBookCoverUpload(e) {
       `${API_BASE}/admin/books/${bookId}/cover` :
       `${API_BASE}/books/${bookId}/cover`;
 
+    console.log('Uploading cover to:', endpoint, 'Admin:', isAdmin);
+
     const response = await fetch(endpoint, {
       method: 'PUT',
       credentials: 'include',
@@ -387,10 +395,22 @@ async function handleEditBookCoverUpload(e) {
     });
 
     const result = await response.json();
+    console.log('Cover upload result:', result);
 
     if (result.success) {
-      // Update preview
-      document.getElementById('editBookCoverPreview').src = result.data.cover_image;
+      // Update preview - use cover_image or thumbnail_image
+      const newCover = result.data.cover_image || result.data.thumbnail_image;
+      document.getElementById('editBookCoverPreview').src = newCover;
+
+      // Show success
+      statusEl.textContent = t('coverUpdated');
+      statusEl.className = 'status-message status-success';
+
+      // Hide after 3 seconds
+      setTimeout(() => {
+        statusEl.style.display = 'none';
+      }, 3000);
+
       // Refresh views
       loadBooks();
       if (isAdmin) {

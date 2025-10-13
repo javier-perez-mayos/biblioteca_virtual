@@ -328,7 +328,7 @@ async function handleLogout(e) {
 
     currentUser = null;
     updateUIForAuth(false);
-    loadBooks();
+    showLoginRequired(); // Show login required state instead of trying to load books
   } catch (error) {
     console.error('Logout error:', error);
   }

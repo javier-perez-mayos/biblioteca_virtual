@@ -235,7 +235,6 @@ async function handleLogin(e) {
       closeLoginModal();
       updateUIForAuth(true);
       loadBooks();
-      showSuccess('¡Bienvenido de vuelta!');
     } else {
       showError(result.error || 'Error al iniciar sesión', 'loginError');
     }
@@ -290,7 +289,6 @@ async function handleRegister(e) {
       closeRegisterModal();
       updateUIForAuth(true);
       loadBooks();
-      showSuccess('¡Cuenta creada exitosamente!');
     } else {
       const errorMsg = result.errors ? result.errors.map(e => e.msg).join(', ') : result.error;
       showError(errorMsg || 'Error al registrarse', 'registerError');
@@ -314,7 +312,6 @@ async function handleLogout(e) {
     currentUser = null;
     updateUIForAuth(false);
     loadBooks();
-    showSuccess('Sesión cerrada');
   } catch (error) {
     console.error('Logout error:', error);
   }
@@ -468,7 +465,7 @@ async function handleProfilePictureUpload(e) {
     if (result.success) {
       document.getElementById('profilePicturePreview').src = result.data.profile_picture;
       document.getElementById('userAvatar').src = result.data.profile_picture;
-      showSuccess('Foto de perfil actualizada');
+      // Profile picture updated successfully
     } else {
       showError(result.error || 'Error al subir foto');
     }
@@ -597,7 +594,6 @@ async function returnBook(bookId) {
     const result = await response.json();
 
     if (result.success) {
-      showSuccess(t('bookReturned'));
       loadBorrowedBooks();
       loadBooks();
     } else {
@@ -1062,7 +1058,6 @@ async function handleBookSubmit(event) {
       closeAddBookModal();
       loadBooks();
       loadStats();
-      showSuccess('Libro agregado exitosamente');
     } else {
       showError('Error guardando libro: ' + result.error);
     }
@@ -1200,7 +1195,6 @@ async function borrowBook(bookId) {
     if (result.success) {
       closeBookDetailModal();
       loadBooks();
-      showSuccess(t('bookBorrowed'));
     } else {
       showError(result.error || t('errorOccurred'));
     }
@@ -1228,7 +1222,6 @@ async function deleteBook(bookId) {
       closeBookDetailModal();
       loadBooks();
       loadStats();
-      showSuccess(t('bookDeleted'));
     } else {
       showError(result.error || t('errorOccurred'));
     }

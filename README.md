@@ -4,7 +4,12 @@ A modern web application for managing an online library with automatic book reco
 
 ## Features
 
-- **📸 Book Recognition**: Add books by taking a photo of the cover or uploading an image
+- **📸 Advanced Book Recognition**: Multiple recognition methods for maximum accuracy
+  - Google Vision API for image-based search
+  - OCR (Tesseract.js) for text extraction from covers
+  - ISBN detection and lookup
+  - Title/author extraction and matching
+- **✍️ Manual Entry with Auto-Complete**: Enter just the title or ISBN, and auto-complete the rest
 - **🤖 Automatic Metadata**: Automatically fetches book information from Google Books API
 - **🔍 Search & Filter**: Search books by title, author, ISBN, or categories
 - **🎨 Visual Catalog**: Beautiful grid layout displaying book covers
@@ -18,9 +23,11 @@ A modern web application for managing an online library with automatic book reco
 ### Backend
 - Node.js + Express
 - SQLite3 for database
-- Tesseract.js for OCR
+- Tesseract.js for OCR text extraction
+- Google Vision API for advanced image recognition (optional)
 - Sharp for image processing
 - Google Books API for book metadata
+- Cheerio for web scraping fallback
 - Multer for file uploads
 
 ### Frontend
@@ -45,14 +52,27 @@ npm install
 npm run init-db
 ```
 
-4. **(Optional) Get a Google Books API key**:
+4. **(Optional but Recommended) Configure API keys**:
+
+   **Google Books API** (recommended for better metadata):
    - Visit: https://developers.google.com/books/docs/v1/using#APIKey
    - Create a project and enable Books API
-   - Copy your API key to `.env` file:
+   - Add to `.env`:
    ```
    GOOGLE_BOOKS_API_KEY=your_api_key_here
    ```
-   Note: The app works without an API key, but may have rate limits.
+
+   **Google Vision API** (optional, for advanced image recognition):
+   - Visit: https://cloud.google.com/vision/docs/setup
+   - Create a project and enable Vision API
+   - Create a service account and download credentials JSON
+   - Add to `.env`:
+   ```
+   GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
+   GOOGLE_VISION_API_KEY=your_vision_api_key
+   ```
+
+   Note: The app works without API keys using free tiers and fallback methods, but recognition accuracy improves with Vision API.
 
 5. **Start the server**:
 ```bash
@@ -67,15 +87,25 @@ npm start
 ### Adding a Book
 
 1. Click the **"+ Agregar Libro"** button
-2. Choose one of two options:
+2. Choose one of three options:
+
+   **Option A: Image Recognition (Recommended)**
    - **📷 Tomar Foto**: Use your device camera to capture the book cover
    - **📁 Subir Archivo**: Upload an image file from your device
-3. The app will automatically:
-   - Extract text from the cover using OCR
-   - Search for ISBN or book title
-   - Fetch complete book information from Google Books
-4. Review and edit the book information if needed
-5. Click **"Guardar Libro"** to add it to your library
+   - The app will automatically:
+     1. Try Google Vision API for image-based recognition (if configured)
+     2. Use OCR to extract text from the cover
+     3. Detect ISBN from the extracted text
+     4. Search Google Books API for complete metadata
+
+   **Option B: Manual Entry with Auto-Complete**
+   - **✍️ Entrada Manual**: Enter book details manually
+   - Enter at least one field (title, author, or ISBN)
+   - Click **"🔍 Autocompletar Datos"** to automatically fill missing information
+   - The system will search Google Books and complete all available fields
+
+3. Review and edit the book information if needed
+4. Click **"Guardar Libro"** to add it to your library
 
 ### Searching Books
 
@@ -105,7 +135,8 @@ biblioteca_virtual/
 │   └── app.js          # Frontend JavaScript
 ├── services/           # Backend services
 │   ├── database.js     # Database operations
-│   └── bookRecognition.js  # OCR and book recognition
+│   ├── bookRecognition.js  # Multi-method book recognition
+│   └── imageSearch.js  # Image search and data completion
 ├── scripts/            # Utility scripts
 │   └── init-db.js     # Database initialization
 ├── uploads/            # Uploaded cover images (created automatically)
@@ -125,8 +156,9 @@ biblioteca_virtual/
 - `PUT /api/books/:id` - Update book
 - `DELETE /api/books/:id` - Delete book
 
-### Upload
+### Upload & Recognition
 - `POST /api/books/upload` - Upload and recognize book cover
+- `POST /api/books/complete` - Complete partial book data
 
 ### Stats
 - `GET /api/stats` - Get library statistics
@@ -136,10 +168,12 @@ biblioteca_virtual/
 Edit the `.env` file to customize:
 
 ```env
-PORT=3000                    # Server port
-DB_PATH=./database.db        # Database file path
-UPLOAD_DIR=./uploads         # Upload directory
-GOOGLE_BOOKS_API_KEY=        # Google Books API key (optional)
+PORT=3000                           # Server port
+DB_PATH=./database.db               # Database file path
+UPLOAD_DIR=./uploads                # Upload directory
+GOOGLE_BOOKS_API_KEY=               # Google Books API key (optional)
+GOOGLE_VISION_API_KEY=              # Google Vision API key (optional)
+GOOGLE_APPLICATION_CREDENTIALS=     # Path to Vision API credentials (optional)
 ```
 
 ## Development
@@ -155,20 +189,28 @@ This uses nodemon to automatically restart the server when files change.
 ## Tips
 
 ### Better Book Recognition
-- Take clear photos with good lighting
-- Ensure the book cover is flat and fully visible
-- Center the cover in the frame
-- Avoid shadows and reflections
+- **For best results with images:**
+  - Take clear photos with good lighting
+  - Ensure the book cover is flat and fully visible
+  - Center the cover in the frame
+  - Avoid shadows and reflections
+  - Enable Google Vision API for significantly better accuracy
+- **For manual entry:**
+  - Enter as much information as you have
+  - Use the "Autocompletar Datos" button to fill missing fields
+  - Even just the title or ISBN is usually enough
 
 ### Using without Camera
 - If camera access is denied or unavailable, use the file upload option
 - Works with JPEG, PNG, GIF, and WebP images
 - Maximum file size: 10MB
 
-### Manual Entry
-- If automatic recognition fails, you can manually enter book details
-- Only the title is required - all other fields are optional
-- You can always edit book information later
+### Recognition Methods Priority
+The app tries multiple methods in this order:
+1. **Google Vision API** (if configured) - Most accurate for image recognition
+2. **OCR + ISBN lookup** - Good for covers with visible ISBN
+3. **OCR + Title/Author matching** - Fallback for books without ISBN
+4. **Manual entry + Auto-complete** - User provides partial data, system fills the rest
 
 ## Troubleshooting
 
@@ -180,7 +222,9 @@ This uses nodemon to automatically restart the server when files change.
 ### Book not recognized
 - Try a clearer photo of the cover
 - Ensure the ISBN is visible on the cover
-- Use manual entry if automatic recognition fails
+- Consider enabling Google Vision API for better recognition
+- Use manual entry with the "Autocompletar" button as alternative
+- Enter just the title or ISBN and let the system find the rest
 
 ### Database errors
 - Run `npm run init-db` to reset the database

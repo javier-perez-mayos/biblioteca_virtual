@@ -268,6 +268,44 @@ app.delete('/api/books/:id', async (req, res) => {
 });
 
 /**
+ * POST /api/books/complete - Complete partial book data
+ */
+app.post('/api/books/complete', async (req, res) => {
+  try {
+    const partialData = req.body;
+
+    if (!partialData || Object.keys(partialData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Partial book data is required'
+      });
+    }
+
+    console.log('Completing partial book data:', partialData);
+
+    // Try to complete the book data
+    const completedData = await bookRecognition.completeBookData(partialData);
+
+    if (completedData && completedData.title) {
+      res.json({
+        success: true,
+        data: completedData,
+        message: 'Book data completed successfully'
+      });
+    } else {
+      res.json({
+        success: false,
+        data: partialData,
+        message: 'Could not find additional book information'
+      });
+    }
+  } catch (error) {
+    console.error('Error completing book data:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/stats - Get library statistics
  */
 app.get('/api/stats', async (req, res) => {

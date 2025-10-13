@@ -1,6 +1,7 @@
 const Tesseract = require('tesseract.js');
 const axios = require('axios');
 const sharp = require('sharp');
+const imageSearch = require('./imageSearch');
 
 class BookRecognitionService {
   constructor() {
@@ -119,28 +120,53 @@ class BookRecognitionService {
   }
 
   /**
-   * Try to recognize book from cover image
+   * Try to recognize book from cover image using multiple methods
    */
   async recognizeBook(imagePath) {
     try {
-      console.log('Starting book recognition...');
+      console.log('Starting enhanced book recognition...');
 
-      // Step 1: Extract text from image
+      // STEP 1: Try Google Vision API for image-based search (most accurate)
+      console.log('Step 1: Attempting Google Vision API image search...');
+      const visionResult = await imageSearch.searchByImageVision(imagePath);
+
+      if (visionResult) {
+        const bookInfoFromVision = imageSearch.extractBookInfoFromVision(visionResult);
+
+        if (bookInfoFromVision && bookInfoFromVision.title) {
+          console.log('Vision API found:', bookInfoFromVision);
+
+          // Search Google Books with info from Vision API
+          const bookData = await this.searchByTitleAuthor(
+            bookInfoFromVision.title,
+            bookInfoFromVision.author
+          );
+
+          if (bookData) {
+            console.log('Book matched via Vision API!');
+            return { ...bookData, recognitionMethod: 'vision_api' };
+          }
+        }
+      }
+
+      // STEP 2: Try OCR to extract text from image
+      console.log('Step 2: Attempting OCR text extraction...');
       const extractedText = await this.extractTextFromImage(imagePath);
       console.log('Extracted text:', extractedText.substring(0, 200));
 
-      // Step 2: Try to find ISBN
+      // STEP 3: Try to find ISBN from OCR text
       const isbn = this.extractISBN(extractedText);
 
       if (isbn) {
         console.log('Found ISBN:', isbn);
         const bookData = await this.searchByISBN(isbn);
         if (bookData) {
-          return bookData;
+          console.log('Book matched via ISBN!');
+          return { ...bookData, recognitionMethod: 'isbn_ocr' };
         }
       }
 
-      // Step 3: If no ISBN found, try to extract title from text
+      // STEP 4: If no ISBN found, try to extract title from OCR text
       const lines = extractedText.split('\n').filter(line => line.trim().length > 0);
       if (lines.length > 0) {
         // Assume first non-empty lines might be the title
@@ -150,14 +176,39 @@ class BookRecognitionService {
         console.log('Attempting search with title:', possibleTitle);
         const bookData = await this.searchByTitleAuthor(possibleTitle, possibleAuthor);
         if (bookData) {
-          return bookData;
+          console.log('Book matched via OCR title!');
+          return { ...bookData, recognitionMethod: 'title_ocr' };
         }
       }
 
+      console.log('Could not recognize book with any method');
       return null;
     } catch (error) {
       console.error('Error recognizing book:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Complete partial book data by searching
+   */
+  async completeBookData(partialData) {
+    try {
+      console.log('Completing book data with partial information:', partialData);
+
+      // Use the image search service to complete the data
+      const completedData = await imageSearch.completeBookData(partialData);
+
+      if (completedData) {
+        console.log('Successfully completed book data');
+        return completedData;
+      }
+
+      console.log('Could not complete book data');
+      return partialData;
+    } catch (error) {
+      console.error('Error completing book data:', error);
+      return partialData;
     }
   }
 

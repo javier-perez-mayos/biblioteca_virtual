@@ -26,9 +26,11 @@ function initializeEventListeners() {
   document.getElementById('uploadFileBtn').addEventListener('click', () => {
     document.getElementById('coverInput').click();
   });
+  document.getElementById('manualEntryBtn').addEventListener('click', showManualEntryForm);
   document.getElementById('coverInput').addEventListener('change', handleFileUpload);
   document.getElementById('captureBtn').addEventListener('click', capturePhoto);
   document.getElementById('cancelCameraBtn').addEventListener('click', stopCamera);
+  document.getElementById('autoCompleteBtn').addEventListener('click', autoCompleteBookData);
 
   // Book form
   document.getElementById('bookForm').addEventListener('submit', handleBookSubmit);
@@ -202,6 +204,36 @@ function stopCamera() {
   document.querySelector('.upload-area').style.display = 'flex';
 }
 
+// Manual entry functionality
+function showManualEntryForm() {
+  document.getElementById('uploadStep').style.display = 'none';
+  document.getElementById('detailsStep').style.display = 'block';
+
+  // Show info message
+  showRecognitionStatus(
+    'Entrada manual: Completa los campos que conozcas y usa "Autocompletar" para buscar el resto.',
+    'info'
+  );
+
+  // Clear all form fields for manual entry
+  document.getElementById('bookTitle').value = '';
+  document.getElementById('bookAuthor').value = '';
+  document.getElementById('bookISBN').value = '';
+  document.getElementById('bookPublisher').value = '';
+  document.getElementById('bookPublishedDate').value = '';
+  document.getElementById('bookDescription').value = '';
+  document.getElementById('bookPages').value = '';
+  document.getElementById('bookLanguage').value = '';
+  document.getElementById('bookCategories').value = '';
+  document.getElementById('bookCoverImage').value = '';
+  document.getElementById('bookThumbnail').value = '';
+  document.getElementById('bookGoogleId').value = '';
+
+  // Hide preview image
+  document.getElementById('previewImage').src = '';
+  document.querySelector('.form-preview').style.display = 'none';
+}
+
 function capturePhoto() {
   const video = document.getElementById('cameraVideo');
   const canvas = document.getElementById('cameraCanvas');
@@ -300,6 +332,106 @@ function showRecognitionStatus(message, type) {
   const statusDiv = document.getElementById('recognitionStatus');
   statusDiv.textContent = message;
   statusDiv.className = `status-message status-${type}`;
+  statusDiv.style.display = 'block';
+}
+
+// Auto-complete book data
+async function autoCompleteBookData() {
+  try {
+    // Get current form values
+    const partialData = {
+      title: document.getElementById('bookTitle').value.trim(),
+      author: document.getElementById('bookAuthor').value.trim(),
+      isbn: document.getElementById('bookISBN').value.trim()
+    };
+
+    // Check if at least one field has data
+    if (!partialData.title && !partialData.author && !partialData.isbn) {
+      showRecognitionStatus('Por favor, ingresa al menos el título, autor o ISBN para autocompletar.', 'warning');
+      return;
+    }
+
+    // Show loading state
+    const autoCompleteBtn = document.getElementById('autoCompleteBtn');
+    const originalText = autoCompleteBtn.textContent;
+    autoCompleteBtn.disabled = true;
+    autoCompleteBtn.textContent = '🔄 Buscando...';
+
+    showRecognitionStatus('Buscando información del libro...', 'info');
+
+    // Call the complete API
+    const response = await fetch(`${API_BASE}/books/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(partialData)
+    });
+
+    const result = await response.json();
+
+    // Restore button state
+    autoCompleteBtn.disabled = false;
+    autoCompleteBtn.textContent = originalText;
+
+    if (result.success && result.data) {
+      // Merge completed data with existing data (keep user-entered values)
+      const completedData = result.data;
+
+      // Only update empty fields
+      if (!document.getElementById('bookTitle').value && completedData.title) {
+        document.getElementById('bookTitle').value = completedData.title;
+      }
+      if (!document.getElementById('bookAuthor').value && completedData.author) {
+        document.getElementById('bookAuthor').value = completedData.author;
+      }
+      if (!document.getElementById('bookISBN').value && completedData.isbn) {
+        document.getElementById('bookISBN').value = completedData.isbn;
+      }
+      if (!document.getElementById('bookPublisher').value && completedData.publisher) {
+        document.getElementById('bookPublisher').value = completedData.publisher;
+      }
+      if (!document.getElementById('bookPublishedDate').value && completedData.published_date) {
+        document.getElementById('bookPublishedDate').value = completedData.published_date;
+      }
+      if (!document.getElementById('bookDescription').value && completedData.description) {
+        document.getElementById('bookDescription').value = completedData.description;
+      }
+      if (!document.getElementById('bookPages').value && completedData.page_count) {
+        document.getElementById('bookPages').value = completedData.page_count;
+      }
+      if (!document.getElementById('bookLanguage').value && completedData.language) {
+        document.getElementById('bookLanguage').value = completedData.language;
+      }
+      if (!document.getElementById('bookCategories').value && completedData.categories) {
+        document.getElementById('bookCategories').value = completedData.categories;
+      }
+
+      // Update cover image if available
+      if (completedData.cover_image || completedData.thumbnail_image) {
+        const coverUrl = completedData.cover_image || completedData.thumbnail_image;
+        document.getElementById('bookCoverImage').value = coverUrl;
+        document.getElementById('bookThumbnail').value = coverUrl;
+        document.getElementById('previewImage').src = coverUrl;
+        document.querySelector('.form-preview').style.display = 'block';
+      }
+
+      if (completedData.google_books_id) {
+        document.getElementById('bookGoogleId').value = completedData.google_books_id;
+      }
+
+      showRecognitionStatus('✅ Información completada exitosamente. Verifica los datos.', 'success');
+    } else {
+      showRecognitionStatus('⚠️ No se encontró información adicional. Intenta con datos más específicos.', 'warning');
+    }
+  } catch (error) {
+    console.error('Error auto-completing book data:', error);
+    showRecognitionStatus('❌ Error al buscar información. Por favor, intenta de nuevo.', 'error');
+
+    const autoCompleteBtn = document.getElementById('autoCompleteBtn');
+    autoCompleteBtn.disabled = false;
+    autoCompleteBtn.textContent = '🔍 Autocompletar Datos';
+  }
 }
 
 // Submit book form

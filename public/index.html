@@ -62,13 +62,17 @@
           <button class="close-btn" onclick="closeAddBookModal()">&times;</button>
         </div>
         <div class="modal-body">
-          <!-- Step 1: Upload Cover -->
+          <!-- Step 1: Upload Cover or Manual Entry -->
           <div id="uploadStep" class="form-step">
-            <h3>Paso 1: Sube la portada del libro</h3>
+            <h3>Agregar Libro</h3>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;">
+              Elige una opción para agregar tu libro
+            </p>
             <div class="upload-area">
               <input type="file" id="coverInput" accept="image/*" style="display: none;" />
-              <button id="takePictureBtn" class="btn-secondary">📷 Tomar Foto</button>
-              <button id="uploadFileBtn" class="btn-secondary">📁 Subir Archivo</button>
+              <button id="takePictureBtn" class="btn-secondary">📷 Tomar Foto de la Portada</button>
+              <button id="uploadFileBtn" class="btn-secondary">📁 Subir Imagen de Portada</button>
+              <button id="manualEntryBtn" class="btn-secondary">✍️ Entrada Manual</button>
             </div>
             <div id="cameraPreview" style="display: none;">
               <video id="cameraVideo" autoplay playsinline></video>
@@ -148,6 +152,7 @@
               <input type="hidden" id="bookGoogleId" />
 
               <div class="form-actions">
+                <button type="button" id="autoCompleteBtn" class="btn-secondary" style="margin-right: auto;">🔍 Autocompletar Datos</button>
                 <button type="button" class="btn-secondary" onclick="closeAddBookModal()">Cancelar</button>
                 <button type="submit" class="btn-primary">Guardar Libro</button>
               </div>

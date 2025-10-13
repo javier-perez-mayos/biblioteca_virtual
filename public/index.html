@@ -136,23 +136,23 @@
             </p>
             <div class="upload-area">
               <input type="file" id="coverInput" accept="image/*" style="display: none;" />
-              <button id="takePictureBtn" class="btn-secondary">📷 Tomar Foto de la Portada</button>
-              <button id="uploadFileBtn" class="btn-secondary">📁 Subir Imagen de Portada</button>
+              <button id="takePictureBtn" class="btn-secondary" data-i18n="takePictureCover">📷 Fer Foto de la Portada</button>
+              <button id="uploadFileBtn" class="btn-secondary" data-i18n="uploadFileCover">📁 Pujar Imatge de Portada</button>
               <button id="manualEntryBtn" class="btn-secondary" data-i18n="manualEntry">✍️ Entrada Manual</button>
             </div>
             <div id="cameraPreview" style="display: none;">
               <video id="cameraVideo" autoplay playsinline></video>
               <canvas id="cameraCanvas" style="display: none;"></canvas>
               <div class="camera-controls">
-                <button id="captureBtn" class="btn-primary">📸 Capturar</button>
-                <button id="cancelCameraBtn" class="btn-secondary">Cancelar</button>
+                <button id="captureBtn" class="btn-primary" data-i18n="capture">📸 Capturar</button>
+                <button id="cancelCameraBtn" class="btn-secondary" data-i18n="cancel">Cancel·lar</button>
               </div>
             </div>
             <div id="uploadProgress" style="display: none;">
               <div class="progress-bar">
                 <div class="progress-fill"></div>
               </div>
-              <p class="progress-text">Subiendo y analizando imagen...</p>
+              <p class="progress-text" data-i18n="uploadingAnalyzing">Pujant i analitzant imatge...</p>
             </div>
           </div>
 

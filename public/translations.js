@@ -32,6 +32,8 @@ const translations = {
     editBook: 'Edit Book',
     bookDetails: 'Book Details',
     takePicture: '📷 Take Picture',
+    takePictureCover: '📷 Take Picture of Cover',
+    uploadFileCover: '📁 Upload Cover Image',
     uploadFile: '📁 Upload File',
     manualEntry: '✍️ Manual Entry',
     autocomplete: '🔍 Autocomplete Data',
@@ -170,7 +172,9 @@ const translations = {
     noBorrowedCurrently: 'You don\'t have any books borrowed currently',
     loginRequiredTitle: 'Login Required',
     loginRequiredMessage: 'Please login or register to access the library',
-    loginToAccess: 'Login to Access Library'
+    loginToAccess: 'Login to Access Library',
+    capture: '📸 Capture',
+    uploadingAnalyzing: 'Uploading and analyzing image...'
   },
 
   de: {
@@ -206,6 +210,8 @@ const translations = {
     editBook: 'Buch bearbeiten',
     bookDetails: 'Buchdetails',
     takePicture: '📷 Foto aufnehmen',
+    takePictureCover: '📷 Foto vom Cover aufnehmen',
+    uploadFileCover: '📁 Coverbild hochladen',
     uploadFile: '📁 Datei hochladen',
     manualEntry: '✍️ Manuelle Eingabe',
     autocomplete: '🔍 Daten automatisch vervollständigen',
@@ -344,7 +350,9 @@ const translations = {
     noBorrowedCurrently: 'Sie haben derzeit keine Bücher ausgeliehen',
     loginRequiredTitle: 'Anmeldung erforderlich',
     loginRequiredMessage: 'Bitte melden Sie sich an oder registrieren Sie sich, um auf die Bibliothek zuzugreifen',
-    loginToAccess: 'Anmelden, um auf Bibliothek zuzugreifen'
+    loginToAccess: 'Anmelden, um auf Bibliothek zuzugreifen',
+    capture: '📸 Aufnehmen',
+    uploadingAnalyzing: 'Hochladen und Analysieren des Bildes...'
   },
 
   ca: {
@@ -380,6 +388,8 @@ const translations = {
     editBook: 'Editar Llibre',
     bookDetails: 'Detalls del Llibre',
     takePicture: '📷 Fer Foto',
+    takePictureCover: '📷 Fer Foto de la Portada',
+    uploadFileCover: '📁 Pujar Imatge de Portada',
     uploadFile: '📁 Pujar Arxiu',
     manualEntry: '✍️ Entrada Manual',
     autocomplete: '🔍 Autocompletar Dades',
@@ -518,7 +528,9 @@ const translations = {
     noBorrowedCurrently: 'No tens cap llibre prestat actualment',
     loginRequiredTitle: 'Cal iniciar sessió',
     loginRequiredMessage: 'Si us plau, inicieu sessió o registreu-vos per accedir a la biblioteca',
-    loginToAccess: 'Iniciar Sessió per Accedir a la Biblioteca'
+    loginToAccess: 'Iniciar Sessió per Accedir a la Biblioteca',
+    capture: '📸 Capturar',
+    uploadingAnalyzing: 'Pujant i analitzant imatge...'
   }
 };
 

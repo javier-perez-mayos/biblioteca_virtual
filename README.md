@@ -69,21 +69,33 @@ cd biblioteca_virtual
 npm install
 ```
 
-3. **Initialize the database**:
+3. **Configure environment variables**:
+
+Create a `.env` file from the example:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+```bash
+ADMIN_PASSWORD=your_secure_password_here
+```
+
+4. **Initialize the database**:
 ```bash
 npm run init-db
 ```
 
-4. **Create the administrator account**:
+5. **Create the administrator account**:
 ```bash
 node scripts/add-admin.js
 ```
 
 This creates an admin user with:
-- Email: `admin@biblioteca.com`
-- Password: `Ho haveu vist? La mare que ens va parir!`
+- Email: `biblioteca@casalmunic.de`
+- Password: From `ADMIN_PASSWORD` environment variable
 
-5. **(Optional but Recommended) Configure API keys**:
+6. **(Optional but Recommended) Configure API keys**:
 
    **Google Books API** (recommended for better metadata):
    - Visit: https://developers.google.com/books/docs/v1/using#APIKey

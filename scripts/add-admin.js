@@ -1,8 +1,17 @@
+require('dotenv').config();
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const path = require('path');
 
 const dbPath = process.env.DB_PATH || './database.db';
+const ADMIN_EMAIL = 'biblioteca@casalmunic.de';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  console.error('❌ Error: ADMIN_PASSWORD environment variable is not set');
+  console.error('Please set ADMIN_PASSWORD in your .env file or environment');
+  process.exit(1);
+}
 
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
@@ -34,7 +43,7 @@ db.serialize(async () => {
   // Wait a bit for the ALTER TABLE operations to complete
   setTimeout(async () => {
     // Check if admin user already exists
-    db.get(`SELECT id FROM users WHERE email = ?`, ['admin@biblioteca.com'], async (err, row) => {
+    db.get(`SELECT id FROM users WHERE email = ?`, [ADMIN_EMAIL], async (err, row) => {
       if (err) {
         console.error('Error checking for admin user:', err);
         db.close();
@@ -42,14 +51,14 @@ db.serialize(async () => {
       }
 
       if (row) {
-        console.log('Admin user already exists');
+        console.log('ℹ️  Admin user already exists');
+        console.log('  Email:', ADMIN_EMAIL);
         db.close();
         return;
       }
 
       // Create admin user
-      const adminPassword = "Ho haveu vist? La mare que ens va parir!";
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
       const insertSql = `
         INSERT INTO users (name, email, password, postal_address, telephone, is_admin, is_enabled)
@@ -58,17 +67,17 @@ db.serialize(async () => {
 
       db.run(insertSql, [
         'Administrator',
-        'admin@biblioteca.com',
+        ADMIN_EMAIL,
         hashedPassword,
-        'Biblioteca Virtual HQ',
-        '+0000000000'
+        'Casal Catalá de Munic',
+        '+49 000000000'
       ], function(err) {
         if (err) {
-          console.error('Error creating admin user:', err);
+          console.error('❌ Error creating admin user:', err);
         } else {
           console.log('✓ Admin user created successfully');
-          console.log('  Email: admin@biblioteca.com');
-          console.log('  Password: Ho haveu vist? La mare que ens va parir!');
+          console.log('  Email:', ADMIN_EMAIL);
+          console.log('  Password: (set from ADMIN_PASSWORD environment variable)');
         }
         db.close();
       });

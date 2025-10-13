@@ -4,6 +4,7 @@ A modern web application for managing an online library with automatic book reco
 
 ## Features
 
+### Book Management
 - **📸 Advanced Book Recognition**: Multiple recognition methods for maximum accuracy
   - Google Vision API for image-based search
   - OCR (Tesseract.js) for text extraction from covers
@@ -14,18 +15,39 @@ A modern web application for managing an online library with automatic book reco
 - **🔍 Search & Filter**: Search books by title, author, ISBN, or categories
 - **🎨 Visual Catalog**: Beautiful grid layout displaying book covers
 - **📖 Detailed View**: View complete book information including description, publisher, and more
+- **📷 Camera Support**: Use your device camera to capture book covers
+
+### User System
+- **👤 User Registration**: Full registration with name, email, postal address, and telephone
+- **🔐 Authentication**: Secure login with bcrypt password hashing and session management
+- **📝 Profile Management**: Users can update their profile, change password, and upload profile pictures
+- **📚 Book Ownership**: Track which user added each book to the library
+- **📖 Borrowing System**: Users can borrow and return books with due date tracking
+- **📊 Personal Dashboard**: View your added books and borrowed books
+
+### Administrator Features
+- **👨‍💼 Admin Panel**: Special administrator account with elevated privileges
+- **👥 User Management**: View all registered users and enable/disable accounts
+- **📚 Full Book Control**: Modify any book details, change ownership, transfer borrowings
+- **🔄 Borrowing Management**: Transfer active borrowings between users
+- **🛡️ Protected Routes**: Admin-only endpoints secured with middleware
+
+### Technical Features
 - **💾 Local Storage**: All data stored in SQLite database
 - **📱 Responsive Design**: Works on desktop and mobile devices
-- **📷 Camera Support**: Use your device camera to capture book covers
+- **🔒 Security**: Password hashing, session management, role-based access control
 
 ## Technology Stack
 
 ### Backend
 - Node.js + Express
 - SQLite3 for database
+- Bcrypt for password hashing
+- Express-session for session management
+- Express-validator for input validation
 - Tesseract.js for OCR text extraction
 - Google Vision API for advanced image recognition (optional)
-- Sharp for image processing
+- Sharp for image processing (book covers and profile pictures)
 - Google Books API for book metadata
 - Cheerio for web scraping fallback
 - Multer for file uploads
@@ -52,7 +74,16 @@ npm install
 npm run init-db
 ```
 
-4. **(Optional but Recommended) Configure API keys**:
+4. **Create the administrator account**:
+```bash
+node scripts/add-admin.js
+```
+
+This creates an admin user with:
+- Email: `admin@biblioteca.com`
+- Password: `Ho haveu vist? La mare que ens va parir!`
+
+5. **(Optional but Recommended) Configure API keys**:
 
    **Google Books API** (recommended for better metadata):
    - Visit: https://developers.google.com/books/docs/v1/using#APIKey
@@ -74,17 +105,45 @@ npm run init-db
 
    Note: The app works without API keys using free tiers and fallback methods, but recognition accuracy improves with Vision API.
 
-5. **Start the server**:
+6. **Configure session secret** (important for production):
+
+   Edit `.env` and change the SESSION_SECRET:
+   ```env
+   SESSION_SECRET=your_secure_random_secret_here
+   ```
+
+7. **Start the server**:
 ```bash
 npm start
 ```
 
-6. **Open your browser**:
+8. **Open your browser**:
    Navigate to http://localhost:3000
 
 ## Usage
 
-### Adding a Book
+### User Registration and Login
+
+1. Click **"Registrarse"** in the header
+2. Fill in all required fields:
+   - Name
+   - Email
+   - Password (minimum 6 characters)
+   - Postal address
+   - Telephone
+3. After registration, you'll be automatically logged in
+4. Existing users can click **"Iniciar Sesión"** to log in
+
+### User Profile
+
+Access your profile by clicking on your avatar/name in the header:
+
+- **Información**: View and edit your profile details
+- **Cambiar Contraseña**: Change your password (requires old password)
+- **Mis Libros**: See all books you've added to the library
+- **Libros Prestados**: View books you're currently borrowing with due dates
+
+### Adding a Book (Requires Login)
 
 1. Click the **"+ Agregar Libro"** button
 2. Choose one of three options:
@@ -117,30 +176,67 @@ npm start
 
 - Click on any book card to view full details
 - See cover image, description, metadata, and more
-- Option to delete books from the detail view
+- **Borrow books**: Click "Prestar Libro" to borrow available books (14-day loan period)
+- **Delete books**: Only the user who added the book can delete it
+
+### Borrowing Books
+
+1. Find an available book in the catalog
+2. Click on the book to view details
+3. Click **"Prestar Libro"** to borrow it
+4. The book is now in your "Libros Prestados" list with a due date
+5. Return the book from your profile when done
 
 ### Managing Your Library
 
 - Books are displayed in a visual grid sorted by date added (newest first)
 - The statistics bar shows your total book count
 - All data is stored locally in SQLite
+- **Book status badges**: Books show "Disponible" or "Prestado" status
+- **Overdue tracking**: Borrowed books past their due date are highlighted in red
+
+### Administrator Access
+
+Login with the admin account to access additional features:
+
+**User Management:**
+- View all registered users
+- Enable or disable user accounts
+- Disabled users cannot login
+
+**Book Management:**
+- Edit any book details
+- Change book ownership (transfer to another user)
+- Transfer active borrowings between users
+
+**Admin Endpoints** (API access only):
+- `GET /api/admin/users` - List all users
+- `PUT /api/admin/users/:id/toggle-status` - Enable/disable user
+- `GET /api/admin/books` - List all books
+- `PUT /api/admin/books/:id` - Update book details
+- `PUT /api/admin/books/:id/owner` - Change book owner
+- `PUT /api/admin/books/:id/borrower` - Transfer borrowing
 
 ## Project Structure
 
 ```
 biblioteca_virtual/
 ├── public/              # Frontend files
-│   ├── index.html      # Main HTML page
-│   ├── styles.css      # Styles
-│   └── app.js          # Frontend JavaScript
+│   ├── index.html      # Main HTML page with auth UI
+│   ├── styles.css      # Styles including profile components
+│   └── app.js          # Frontend JavaScript with auth logic
 ├── services/           # Backend services
-│   ├── database.js     # Database operations
+│   ├── database.js     # Database operations + admin functions
 │   ├── bookRecognition.js  # Multi-method book recognition
-│   └── imageSearch.js  # Image search and data completion
+│   ├── imageSearch.js  # Image search and data completion
+│   └── auth.js         # Authentication service
+├── middleware/         # Express middleware
+│   └── auth.js        # Authentication & authorization middleware
 ├── scripts/            # Utility scripts
-│   └── init-db.js     # Database initialization
-├── uploads/            # Uploaded cover images (created automatically)
-├── server.js           # Express server
+│   ├── init-db.js     # Database initialization
+│   └── add-admin.js   # Create administrator account
+├── uploads/            # Uploaded images (covers & profiles)
+├── server.js           # Express server with all routes
 ├── package.json        # Dependencies
 ├── .env               # Environment variables
 └── database.db        # SQLite database (created automatically)
@@ -148,20 +244,41 @@ biblioteca_virtual/
 
 ## API Endpoints
 
-### Books
+### Books (Public)
 - `GET /api/books` - Get all books
 - `GET /api/books/:id` - Get book by ID
 - `GET /api/books/search?q=query` - Search books
-- `POST /api/books` - Add new book
-- `PUT /api/books/:id` - Update book
-- `DELETE /api/books/:id` - Delete book
-
-### Upload & Recognition
-- `POST /api/books/upload` - Upload and recognize book cover
-- `POST /api/books/complete` - Complete partial book data
-
-### Stats
 - `GET /api/stats` - Get library statistics
+- `GET /api/books/:id/borrowings` - Get borrowing history for a book
+
+### Books (Authenticated)
+- `POST /api/books` - Add new book (requires login)
+- `POST /api/books/upload` - Upload and recognize book cover (requires login)
+- `POST /api/books/complete` - Complete partial book data (requires login)
+- `DELETE /api/books/:id` - Delete book (requires login + ownership)
+
+### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login user
+- `POST /api/auth/logout` - Logout user
+- `GET /api/auth/me` - Get current user (requires login)
+- `PUT /api/auth/profile` - Update profile (requires login)
+- `POST /api/auth/change-password` - Change password (requires login)
+- `POST /api/auth/profile-picture` - Upload profile picture (requires login)
+- `GET /api/auth/my-books` - Get books added by user (requires login)
+
+### Borrowing (Authenticated)
+- `POST /api/borrowings` - Borrow a book (requires login)
+- `POST /api/borrowings/return` - Return a book (requires login)
+- `GET /api/borrowings/my` - Get user's borrowed books (requires login)
+
+### Admin (Admin Only)
+- `GET /api/admin/users` - Get all users
+- `PUT /api/admin/users/:id/toggle-status` - Enable/disable user
+- `GET /api/admin/books` - Get all books (admin view)
+- `PUT /api/admin/books/:id` - Update any book details
+- `PUT /api/admin/books/:id/owner` - Change book owner
+- `PUT /api/admin/books/:id/borrower` - Change book borrower
 
 ## Configuration
 
@@ -171,10 +288,41 @@ Edit the `.env` file to customize:
 PORT=3000                           # Server port
 DB_PATH=./database.db               # Database file path
 UPLOAD_DIR=./uploads                # Upload directory
+SESSION_SECRET=change_this_secret   # Session secret (CHANGE IN PRODUCTION!)
 GOOGLE_BOOKS_API_KEY=               # Google Books API key (optional)
 GOOGLE_VISION_API_KEY=              # Google Vision API key (optional)
 GOOGLE_APPLICATION_CREDENTIALS=     # Path to Vision API credentials (optional)
 ```
+
+### Database Schema
+
+**users** table:
+- `id` - Primary key
+- `name` - User's full name
+- `email` - Unique email address
+- `password` - Bcrypt hashed password
+- `postal_address` - User's postal address
+- `telephone` - User's telephone number
+- `profile_picture` - Path to profile picture (optional)
+- `is_admin` - Admin flag (1 for admin, 0 for regular user)
+- `is_enabled` - Account status (1 for enabled, 0 for disabled)
+- `created_date` - Registration timestamp
+
+**books** table:
+- `id` - Primary key
+- `title`, `author`, `isbn`, `publisher`, etc. - Book metadata
+- `status` - 'available' or 'borrowed'
+- `added_by_user_id` - Foreign key to users (book owner)
+- `cover_image`, `thumbnail_image` - Image paths
+
+**borrowing_records** table:
+- `id` - Primary key
+- `book_id` - Foreign key to books
+- `user_id` - Foreign key to users
+- `borrow_date` - When book was borrowed
+- `due_date` - When book should be returned (14 days default)
+- `return_date` - When book was actually returned (NULL if not returned)
+- `status` - 'borrowed' or 'returned'
 
 ## Development
 
@@ -214,6 +362,12 @@ The app tries multiple methods in this order:
 
 ## Troubleshooting
 
+### Authentication Issues
+- **"User account is disabled"**: Your account has been disabled by an administrator
+- **Session expired**: Login again to continue
+- **Cannot delete book**: Only the user who added the book can delete it
+- **Cannot access admin features**: Admin endpoints require administrator privileges
+
 ### Camera not working
 - Ensure browser has camera permissions
 - HTTPS is required for camera access (except on localhost)
@@ -227,13 +381,42 @@ The app tries multiple methods in this order:
 - Enter just the title or ISBN and let the system find the rest
 
 ### Database errors
-- Run `npm run init-db` to reset the database
+- Run `npm run init-db` to reset the database (WARNING: deletes all data)
+- To add admin fields to existing database: `node scripts/add-admin.js`
 - Check file permissions on `database.db`
+
+### Borrowing Issues
+- **Book already borrowed**: Wait for it to be returned or contact admin
+- **Cannot borrow**: Make sure you're logged in
+- Books are automatically due 14 days after borrowing
+
+## Security Considerations
+
+### Production Deployment
+- **Change SESSION_SECRET**: Use a strong random string in production
+- **Use HTTPS**: Required for secure cookies and camera access
+- **Database backups**: Regularly backup `database.db`
+- **File permissions**: Restrict access to database and uploads directory
+- **Password policy**: Current minimum is 6 characters (consider increasing)
+
+### Current Security Features
+- ✅ Bcrypt password hashing (10 rounds)
+- ✅ HTTP-only session cookies
+- ✅ Input validation on all endpoints
+- ✅ Role-based access control (user/admin)
+- ✅ Ownership verification for deletions
+- ✅ Protected admin routes
 
 ## Future Enhancements
 
-- User authentication and multiple libraries
-- Book borrowing/lending system
+Completed features (marked with ✅):
+- ✅ User authentication and multiple libraries
+- ✅ Book borrowing/lending system
+- ✅ User profiles with pictures
+- ✅ Administrator panel
+
+Potential future additions:
+- Admin frontend UI (currently API-only)
 - Export library to CSV/JSON
 - Bulk import from ISBN list
 - Book recommendations
@@ -241,6 +424,9 @@ The app tries multiple methods in this order:
 - Advanced filtering and sorting
 - Reading lists and collections
 - Integration with more book APIs
+- Email notifications for due dates
+- Book reservations queue
+- Reading statistics and history
 
 ## License
 

@@ -19,7 +19,26 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 db.serialize(() => {
-  // Create books table
+  // Create users table with full registration fields
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      postal_address TEXT NOT NULL,
+      telephone TEXT NOT NULL,
+      created_date DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `, (err) => {
+    if (err) {
+      console.error('Error creating users table:', err);
+    } else {
+      console.log('Users table created successfully');
+    }
+  });
+
+  // Create books table with user ownership
   db.run(`
     CREATE TABLE IF NOT EXISTS books (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +56,9 @@ db.serialize(() => {
       added_date DATETIME DEFAULT CURRENT_TIMESTAMP,
       google_books_id TEXT,
       rating REAL,
-      status TEXT DEFAULT 'available'
+      status TEXT DEFAULT 'available',
+      added_by_user_id INTEGER NOT NULL,
+      FOREIGN KEY (added_by_user_id) REFERENCES users(id)
     )
   `, (err) => {
     if (err) {
@@ -47,23 +68,7 @@ db.serialize(() => {
     }
   });
 
-  // Create users table (for future extension)
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      created_date DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `, (err) => {
-    if (err) {
-      console.error('Error creating users table:', err);
-    } else {
-      console.log('Users table created successfully');
-    }
-  });
-
-  // Create borrowing records table (for future extension)
+  // Create borrowing records table
   db.run(`
     CREATE TABLE IF NOT EXISTS borrowing_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +76,8 @@ db.serialize(() => {
       user_id INTEGER NOT NULL,
       borrow_date DATETIME DEFAULT CURRENT_TIMESTAMP,
       return_date DATETIME,
-      due_date DATETIME,
+      due_date DATETIME NOT NULL,
+      status TEXT DEFAULT 'borrowed',
       FOREIGN KEY (book_id) REFERENCES books(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )
@@ -87,6 +93,11 @@ db.serialize(() => {
   db.run(`CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_books_title ON books(title)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_books_author ON books(author)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_books_user ON books(added_by_user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_borrowing_user ON borrowing_records(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_borrowing_book ON borrowing_records(book_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_borrowing_status ON borrowing_records(status)`);
 });
 
 db.close((err) => {

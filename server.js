@@ -1,13 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
+const { body, validationResult } = require('express-validator');
 
 const db = require('./services/database');
 const bookRecognition = require('./services/bookRecognition');
+const authService = require('./services/auth');
+const { requireAuth, attachUser } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,9 +23,28 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 }
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'change-this-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Attach user to all requests
+app.use(attachUser);
+
 app.use('/uploads', express.static(UPLOAD_DIR));
 app.use(express.static('public'));
 
@@ -55,7 +78,118 @@ const upload = multer({
 // Initialize database connection
 db.connect();
 
-// ==================== API Routes ====================
+// ==================== Authentication Routes ====================
+
+/**
+ * POST /api/auth/register - Register a new user
+ */
+app.post('/api/auth/register', [
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('postal_address').trim().notEmpty().withMessage('Postal address is required'),
+  body('telephone').trim().notEmpty().withMessage('Telephone is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const user = await authService.register(req.body);
+
+    // Set session
+    req.session.userId = user.id;
+    req.session.userName = user.name;
+
+    res.status(201).json({
+      success: true,
+      data: user,
+      message: 'Registration successful'
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/login - Login user
+ */
+app.post('/api/auth/login', [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const user = await authService.login(req.body.email, req.body.password);
+
+    // Set session
+    req.session.userId = user.id;
+    req.session.userName = user.name;
+
+    res.json({
+      success: true,
+      data: user,
+      message: 'Login successful'
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(401).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/logout - Logout user
+ */
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        error: 'Logout failed'
+      });
+    }
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  });
+});
+
+/**
+ * GET /api/auth/me - Get current user
+ */
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  try {
+    const user = await authService.getUserById(req.userId);
+    if (user) {
+      res.json({ success: true, data: user });
+    } else {
+      res.status(404).json({ success: false, error: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==================== Book Routes ====================
 
 /**
  * GET /api/books - Get all books
@@ -110,7 +244,7 @@ app.get('/api/books/:id', async (req, res) => {
 /**
  * POST /api/books/upload - Upload book cover and recognize
  */
-app.post('/api/books/upload', upload.single('cover'), async (req, res) => {
+app.post('/api/books/upload', requireAuth, upload.single('cover'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -179,9 +313,9 @@ app.post('/api/books/upload', upload.single('cover'), async (req, res) => {
 });
 
 /**
- * POST /api/books - Add a new book
+ * POST /api/books - Add a new book (requires authentication)
  */
-app.post('/api/books', async (req, res) => {
+app.post('/api/books', requireAuth, async (req, res) => {
   try {
     const bookData = req.body;
 
@@ -201,7 +335,7 @@ app.post('/api/books', async (req, res) => {
       }
     }
 
-    const newBook = await db.addBook(bookData);
+    const newBook = await db.addBook(bookData, req.userId);
     res.status(201).json({
       success: true,
       data: newBook,
@@ -236,12 +370,24 @@ app.put('/api/books/:id', async (req, res) => {
 });
 
 /**
- * DELETE /api/books/:id - Delete book
+ * DELETE /api/books/:id - Delete book (only owner can delete)
  */
-app.delete('/api/books/:id', async (req, res) => {
+app.delete('/api/books/:id', requireAuth, async (req, res) => {
   try {
-    // Get book details to delete associated image
+    // Get book details to check ownership
     const book = await db.getBookById(req.params.id);
+
+    if (!book) {
+      return res.status(404).json({ success: false, error: 'Book not found' });
+    }
+
+    // Check if user owns this book
+    if (book.added_by_user_id !== req.userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'You can only delete books you added'
+      });
+    }
 
     const result = await db.deleteBook(req.params.id);
 
@@ -320,6 +466,109 @@ app.get('/api/stats', async (req, res) => {
   } catch (error) {
     console.error('Error fetching stats:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==================== Borrowing Routes ====================
+
+/**
+ * POST /api/borrowings - Borrow a book
+ */
+app.post('/api/borrowings', requireAuth, async (req, res) => {
+  try {
+    const { book_id, due_days } = req.body;
+
+    if (!book_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Book ID is required'
+      });
+    }
+
+    const borrowing = await db.borrowBook(book_id, req.userId, due_days || 14);
+
+    res.status(201).json({
+      success: true,
+      data: borrowing,
+      message: 'Book borrowed successfully'
+    });
+  } catch (error) {
+    console.error('Error borrowing book:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/borrowings/return - Return a borrowed book
+ */
+app.post('/api/borrowings/return', requireAuth, async (req, res) => {
+  try {
+    const { book_id } = req.body;
+
+    if (!book_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Book ID is required'
+      });
+    }
+
+    const result = await db.returnBook(book_id, req.userId);
+
+    res.json({
+      success: true,
+      data: result,
+      message: 'Book returned successfully'
+    });
+  } catch (error) {
+    console.error('Error returning book:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/borrowings/my - Get current user's borrowing history
+ */
+app.get('/api/borrowings/my', requireAuth, async (req, res) => {
+  try {
+    const includeReturned = req.query.include_returned === 'true';
+    const borrowings = await db.getUserBorrowings(req.userId, includeReturned);
+
+    res.json({
+      success: true,
+      data: borrowings
+    });
+  } catch (error) {
+    console.error('Error fetching borrowings:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/books/:id/borrowings - Get borrowing history for a book
+ */
+app.get('/api/books/:id/borrowings', async (req, res) => {
+  try {
+    const borrowings = await db.getBookBorrowings(req.params.id);
+
+    res.json({
+      success: true,
+      data: borrowings
+    });
+  } catch (error) {
+    console.error('Error fetching book borrowings:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 

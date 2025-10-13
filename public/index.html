@@ -93,15 +93,15 @@
         <!-- Loading State -->
         <div id="loadingState" class="loading-state" style="display: none;">
           <div class="spinner"></div>
-          <p>Cargando libros...</p>
+          <p data-i18n="loadingBooks">Carregant llibres...</p>
         </div>
 
         <!-- Empty State -->
         <div id="emptyState" class="empty-state" style="display: none;">
           <div class="empty-icon">📖</div>
-          <h2>No hay libros en la biblioteca</h2>
-          <p>Comienza agregando tu primer libro tomando una foto de la portada</p>
-          <button class="btn-primary" onclick="openAddBookModal()">Agregar Primer Libro</button>
+          <h2 data-i18n="emptyLibraryTitle">No hi ha llibres a la biblioteca</h2>
+          <p data-i18n="emptyLibraryMessage">Comença afegint el teu primer llibre fent una foto de la portada</p>
+          <button class="btn-primary" onclick="openAddBookModal()" data-i18n="addFirstBook">Afegir Primer Llibre</button>
         </div>
 
         <!-- Books Grid -->
@@ -113,21 +113,21 @@
     <div id="addBookModal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Agregar Nuevo Libro</h2>
+          <h2 data-i18n="addNewBook">Afegir Llibre Nou</h2>
           <button class="close-btn" onclick="closeAddBookModal()">&times;</button>
         </div>
         <div class="modal-body">
           <!-- Step 1: Upload Cover or Manual Entry -->
           <div id="uploadStep" class="form-step">
-            <h3>Agregar Libro</h3>
-            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;">
-              Elige una opción para agregar tu libro
+            <h3 data-i18n="addBook">Afegir Llibre</h3>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;" data-i18n="chooseOption">
+              Tria una opció per afegir el teu llibre
             </p>
             <div class="upload-area">
               <input type="file" id="coverInput" accept="image/*" style="display: none;" />
               <button id="takePictureBtn" class="btn-secondary">📷 Tomar Foto de la Portada</button>
               <button id="uploadFileBtn" class="btn-secondary">📁 Subir Imagen de Portada</button>
-              <button id="manualEntryBtn" class="btn-secondary">✍️ Entrada Manual</button>
+              <button id="manualEntryBtn" class="btn-secondary" data-i18n="manualEntry">✍️ Entrada Manual</button>
             </div>
             <div id="cameraPreview" style="display: none;">
               <video id="cameraVideo" autoplay playsinline></video>
@@ -156,50 +156,50 @@
               </div>
 
               <div class="form-group">
-                <label for="bookTitle">Título *</label>
+                <label for="bookTitle"><span data-i18n="title">Títol</span> *</label>
                 <input type="text" id="bookTitle" required />
               </div>
 
               <div class="form-group">
-                <label for="bookAuthor">Autor</label>
+                <label for="bookAuthor" data-i18n="author">Autor</label>
                 <input type="text" id="bookAuthor" />
               </div>
 
               <div class="form-group">
-                <label for="bookISBN">ISBN</label>
+                <label for="bookISBN" data-i18n="isbn">ISBN</label>
                 <input type="text" id="bookISBN" />
               </div>
 
               <div class="form-group">
-                <label for="bookPublisher">Editorial</label>
+                <label for="bookPublisher" data-i18n="publisher">Editorial</label>
                 <input type="text" id="bookPublisher" />
               </div>
 
               <div class="form-group">
-                <label for="bookPublishedDate">Fecha de Publicación</label>
+                <label for="bookPublishedDate" data-i18n="publishedDate">Data de Publicació</label>
                 <input type="text" id="bookPublishedDate" placeholder="YYYY-MM-DD" />
               </div>
 
               <div class="form-group">
-                <label for="bookDescription">Descripción</label>
+                <label for="bookDescription" data-i18n="description">Descripció</label>
                 <textarea id="bookDescription" rows="4"></textarea>
               </div>
 
               <div class="form-row">
                 <div class="form-group">
-                  <label for="bookPages">Páginas</label>
+                  <label for="bookPages" data-i18n="pageCount">Pàgines</label>
                   <input type="number" id="bookPages" />
                 </div>
 
                 <div class="form-group">
-                  <label for="bookLanguage">Idioma</label>
+                  <label for="bookLanguage" data-i18n="language">Idioma</label>
                   <input type="text" id="bookLanguage" placeholder="es, en, etc." />
                 </div>
               </div>
 
               <div class="form-group">
-                <label for="bookCategories">Categorías</label>
-                <input type="text" id="bookCategories" placeholder="Ficción, Historia, etc." />
+                <label for="bookCategories" data-i18n="categories">Categories</label>
+                <input type="text" id="bookCategories" placeholder="Ficció, Història, etc." />
               </div>
 
               <input type="hidden" id="bookCoverImage" />
@@ -207,9 +207,9 @@
               <input type="hidden" id="bookGoogleId" />
 
               <div class="form-actions">
-                <button type="button" id="autoCompleteBtn" class="btn-secondary" style="margin-right: auto;">🔍 Autocompletar Datos</button>
-                <button type="button" class="btn-secondary" onclick="closeAddBookModal()">Cancelar</button>
-                <button type="submit" class="btn-primary">Guardar Libro</button>
+                <button type="button" id="autoCompleteBtn" class="btn-secondary" style="margin-right: auto;" data-i18n="autocomplete">🔍 Autocompletar Dades</button>
+                <button type="button" class="btn-secondary" onclick="closeAddBookModal()" data-i18n="cancel">Cancel·lar</button>
+                <button type="submit" class="btn-primary" data-i18n="saveBook">Desar Llibre</button>
               </div>
             </form>
           </div>
@@ -221,7 +221,7 @@
     <div id="bookDetailModal" class="modal">
       <div class="modal-content modal-large">
         <div class="modal-header">
-          <h2>Detalles del Libro</h2>
+          <h2 data-i18n="bookDetails">Detalls del Llibre</h2>
           <button class="close-btn" onclick="closeBookDetailModal()">&times;</button>
         </div>
         <div class="modal-body" id="bookDetailContent">
@@ -234,27 +234,27 @@
     <div id="loginModal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2>Iniciar Sesión</h2>
+          <h2 data-i18n="loginTitle">Iniciar Sessió</h2>
           <button class="close-btn" onclick="closeLoginModal()">&times;</button>
         </div>
         <div class="modal-body">
           <form id="loginForm">
             <div class="form-group">
-              <label for="loginEmail">Email</label>
+              <label for="loginEmail" data-i18n="email">Correu Electrònic</label>
               <input type="email" id="loginEmail" required />
             </div>
             <div class="form-group">
-              <label for="loginPassword">Contraseña</label>
+              <label for="loginPassword" data-i18n="password">Contrasenya</label>
               <input type="password" id="loginPassword" required />
             </div>
             <div id="loginError" class="status-message status-error" style="display: none;"></div>
             <div class="form-actions">
-              <button type="button" class="btn-secondary" onclick="closeLoginModal()">Cancelar</button>
-              <button type="submit" class="btn-primary">Iniciar Sesión</button>
+              <button type="button" class="btn-secondary" onclick="closeLoginModal()" data-i18n="cancel">Cancel·lar</button>
+              <button type="submit" class="btn-primary" data-i18n="loginButton">Iniciar Sessió</button>
             </div>
           </form>
           <p style="text-align: center; margin-top: 1rem;">
-            ¿No tienes cuenta? <a href="#" onclick="closeLoginModal(); openRegisterModal()">Regístrate aquí</a>
+            <span data-i18n="noAccount">No tens compte?</span> <a href="#" onclick="closeLoginModal(); openRegisterModal()" data-i18n="registerHere">Registra't aquí</a>
           </p>
         </div>
       </div>
@@ -264,45 +264,45 @@
     <div id="registerModal" class="modal">
       <div class="modal-content modal-large">
         <div class="modal-header">
-          <h2>Registrarse</h2>
+          <h2 data-i18n="registerTitle">Registrar-se</h2>
           <button class="close-btn" onclick="closeRegisterModal()">&times;</button>
         </div>
         <div class="modal-body">
           <form id="registerForm">
             <div class="form-group">
-              <label for="regName">Nombre Completo *</label>
+              <label for="regName"><span data-i18n="name">Nom Complet</span> *</label>
               <input type="text" id="regName" required />
             </div>
             <div class="form-group">
-              <label for="regEmail">Email *</label>
+              <label for="regEmail"><span data-i18n="email">Correu Electrònic</span> *</label>
               <input type="email" id="regEmail" required />
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label for="regPassword">Contraseña *</label>
+                <label for="regPassword"><span data-i18n="password">Contrasenya</span> *</label>
                 <input type="password" id="regPassword" minlength="6" required />
               </div>
               <div class="form-group">
-                <label for="regPasswordConfirm">Confirmar Contraseña *</label>
+                <label for="regPasswordConfirm"><span data-i18n="confirmPassword">Confirmar Contrasenya</span> *</label>
                 <input type="password" id="regPasswordConfirm" minlength="6" required />
               </div>
             </div>
             <div class="form-group">
-              <label for="regAddress">Dirección Postal *</label>
+              <label for="regAddress"><span data-i18n="postalAddress">Adreça Postal</span> *</label>
               <textarea id="regAddress" rows="2" required></textarea>
             </div>
             <div class="form-group">
-              <label for="regPhone">Teléfono *</label>
+              <label for="regPhone"><span data-i18n="telephone">Telèfon</span> *</label>
               <input type="tel" id="regPhone" required />
             </div>
             <div id="registerError" class="status-message status-error" style="display: none;"></div>
             <div class="form-actions">
-              <button type="button" class="btn-secondary" onclick="closeRegisterModal()">Cancelar</button>
-              <button type="submit" class="btn-primary">Crear Cuenta</button>
+              <button type="button" class="btn-secondary" onclick="closeRegisterModal()" data-i18n="cancel">Cancel·lar</button>
+              <button type="submit" class="btn-primary" data-i18n="registerButton">Registrar-se</button>
             </div>
           </form>
           <p style="text-align: center; margin-top: 1rem;">
-            ¿Ya tienes cuenta? <a href="#" onclick="closeRegisterModal(); openLoginModal()">Inicia sesión aquí</a>
+            <span data-i18n="alreadyHaveAccount">Ja tens compte?</span> <a href="#" onclick="closeRegisterModal(); openLoginModal()" data-i18n="loginHere">Inicia sessió aquí</a>
           </p>
         </div>
       </div>
@@ -312,16 +312,16 @@
     <div id="profileModal" class="modal">
       <div class="modal-content modal-large">
         <div class="modal-header">
-          <h2>Mi Perfil</h2>
+          <h2 data-i18n="profileTitle">El Meu Perfil</h2>
           <button class="close-btn" onclick="closeProfileModal()">&times;</button>
         </div>
         <div class="modal-body">
           <!-- Profile Tabs -->
           <div class="profile-tabs">
-            <button class="tab-btn active" data-tab="info">Información</button>
-            <button class="tab-btn" data-tab="password">Cambiar Contraseña</button>
-            <button class="tab-btn" data-tab="my-books">Mis Libros</button>
-            <button class="tab-btn" data-tab="borrowed">Libros Prestados</button>
+            <button class="tab-btn active" data-tab="info" data-i18n="tabInfo">Informació</button>
+            <button class="tab-btn" data-tab="password" data-i18n="tabPassword">Canviar Contrasenya</button>
+            <button class="tab-btn" data-tab="my-books" data-i18n="tabMyBooks">Els Meus Llibres</button>
+            <button class="tab-btn" data-tab="borrowed" data-i18n="tabBorrowed">Llibres Prestats</button>
           </div>
 
           <!-- Profile Info Tab -->
@@ -331,29 +331,29 @@
                 <img id="profilePicturePreview" src="" alt="Profile" />
               </div>
               <input type="file" id="profilePictureInput" accept="image/*" style="display: none;" />
-              <button type="button" class="btn-secondary" onclick="document.getElementById('profilePictureInput').click()">Cambiar Foto</button>
+              <button type="button" class="btn-secondary" onclick="document.getElementById('profilePictureInput').click()" data-i18n="changePhoto">Canviar Foto</button>
             </div>
 
             <form id="profileForm">
               <div class="form-group">
-                <label for="profileName">Nombre Completo</label>
+                <label for="profileName" data-i18n="name">Nom Complet</label>
                 <input type="text" id="profileName" required />
               </div>
               <div class="form-group">
-                <label for="profileEmail">Email</label>
+                <label for="profileEmail" data-i18n="email">Correu Electrònic</label>
                 <input type="email" id="profileEmail" readonly disabled />
               </div>
               <div class="form-group">
-                <label for="profileAddress">Dirección Postal</label>
+                <label for="profileAddress" data-i18n="postalAddress">Adreça Postal</label>
                 <textarea id="profileAddress" rows="2" required></textarea>
               </div>
               <div class="form-group">
-                <label for="profilePhone">Teléfono</label>
+                <label for="profilePhone" data-i18n="telephone">Telèfon</label>
                 <input type="tel" id="profilePhone" required />
               </div>
               <div id="profileUpdateStatus" class="status-message" style="display: none;"></div>
               <div class="form-actions">
-                <button type="submit" class="btn-primary">Guardar Cambios</button>
+                <button type="submit" class="btn-primary" data-i18n="updateProfile">Actualitzar Perfil</button>
               </div>
             </form>
           </div>
@@ -362,20 +362,20 @@
           <div id="tab-password" class="tab-content">
             <form id="passwordForm">
               <div class="form-group">
-                <label for="currentPassword">Contraseña Actual</label>
+                <label for="currentPassword" data-i18n="currentPassword">Contrasenya Actual</label>
                 <input type="password" id="currentPassword" required />
               </div>
               <div class="form-group">
-                <label for="newPassword">Nueva Contraseña</label>
+                <label for="newPassword" data-i18n="newPassword">Nova Contrasenya</label>
                 <input type="password" id="newPassword" minlength="6" required />
               </div>
               <div class="form-group">
-                <label for="confirmNewPassword">Confirmar Nueva Contraseña</label>
+                <label for="confirmNewPassword" data-i18n="confirmNewPassword">Confirmar Nova Contrasenya</label>
                 <input type="password" id="confirmNewPassword" minlength="6" required />
               </div>
               <div id="passwordChangeStatus" class="status-message" style="display: none;"></div>
               <div class="form-actions">
-                <button type="submit" class="btn-primary">Cambiar Contraseña</button>
+                <button type="submit" class="btn-primary" data-i18n="changePassword">Canviar Contrasenya</button>
               </div>
             </form>
           </div>
@@ -384,11 +384,11 @@
           <div id="tab-my-books" class="tab-content">
             <div id="myBooksLoading" class="loading-state" style="display: none;">
               <div class="spinner"></div>
-              <p>Cargando libros...</p>
+              <p data-i18n="loadingBooksEllipsis">Carregant llibres...</p>
             </div>
             <div id="myBooksEmpty" class="empty-state" style="display: none;">
               <div class="empty-icon">📚</div>
-              <p>No has agregado ningún libro todavía</p>
+              <p data-i18n="noBooksAdded">No heu afegit cap llibre encara</p>
             </div>
             <div id="myBooksGrid" class="books-grid"></div>
           </div>
@@ -397,11 +397,11 @@
           <div id="tab-borrowed" class="tab-content">
             <div id="borrowedLoading" class="loading-state" style="display: none;">
               <div class="spinner"></div>
-              <p>Cargando libros prestados...</p>
+              <p data-i18n="loadingBooksEllipsis">Carregant llibres...</p>
             </div>
             <div id="borrowedEmpty" class="empty-state" style="display: none;">
               <div class="empty-icon">📖</div>
-              <p>No tienes libros prestados actualmente</p>
+              <p data-i18n="noBorrowed">No teniu cap llibre prestat</p>
             </div>
             <div id="borrowedList" class="borrowed-list"></div>
           </div>

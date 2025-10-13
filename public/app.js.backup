@@ -400,13 +400,13 @@ async function handleProfileUpdate(e) {
     if (result.success) {
       currentUser = result.data;
       updateUIForAuth(true);
-      showStatusMessage(t('profileUpdated'), 'success', 'profileUpdateStatus');
+      showStatusMessage('Perfil actualizado correctamente', 'success', 'profileUpdateStatus');
     } else {
-      showStatusMessage(result.error || t('errorUpdatingProfile'), 'error', 'profileUpdateStatus');
+      showStatusMessage(result.error || 'Error al actualizar perfil', 'error', 'profileUpdateStatus');
     }
   } catch (error) {
     console.error('Profile update error:', error);
-    showStatusMessage(t('connectionError'), 'error', 'profileUpdateStatus');
+    showStatusMessage('Error de conexión', 'error', 'profileUpdateStatus');
   }
 }
 
@@ -417,7 +417,7 @@ async function handlePasswordChange(e) {
   const confirmPassword = document.getElementById('confirmNewPassword').value;
 
   if (newPassword !== confirmPassword) {
-    showStatusMessage(t('newPasswordMismatch'), 'error', 'passwordChangeStatus');
+    showStatusMessage('Las nuevas contraseñas no coinciden', 'error', 'passwordChangeStatus');
     return;
   }
 
@@ -436,13 +436,13 @@ async function handlePasswordChange(e) {
 
     if (result.success) {
       document.getElementById('passwordForm').reset();
-      showStatusMessage(t('passwordChanged'), 'success', 'passwordChangeStatus');
+      showStatusMessage('Contraseña cambiada correctamente', 'success', 'passwordChangeStatus');
     } else {
-      showStatusMessage(result.error || t('errorChangingPassword'), 'error', 'passwordChangeStatus');
+      showStatusMessage(result.error || 'Error al cambiar contraseña', 'error', 'passwordChangeStatus');
     }
   } catch (error) {
     console.error('Password change error:', error);
-    showStatusMessage(t('connectionError'), 'error', 'passwordChangeStatus');
+    showStatusMessage('Error de conexión', 'error', 'passwordChangeStatus');
   }
 }
 
@@ -467,11 +467,11 @@ async function handleProfilePictureUpload(e) {
       document.getElementById('userAvatar').src = result.data.profile_picture;
       // Profile picture updated successfully
     } else {
-      showError(result.error || t('errorUploadingPhoto'));
+      showError(result.error || 'Error al subir foto');
     }
   } catch (error) {
     console.error('Profile picture upload error:', error);
-    showError(t('connectionError'));
+    showError('Error de conexión');
   }
 }
 
@@ -560,20 +560,20 @@ function createBorrowedItem(borrowing) {
     </div>
     <div class="borrowed-item-info">
       <div class="borrowed-item-title">${escapeHtml(borrowing.title)}</div>
-      <div class="borrowed-item-author">${escapeHtml(borrowing.author || t('unknownAuthor'))}</div>
+      <div class="borrowed-item-author">${escapeHtml(borrowing.author || 'Autor desconocido')}</div>
       <div class="borrowed-item-dates">
         <div class="borrowed-item-date">
-          <span class="date-label">${t('borrowedOn')}</span>
+          <span class="date-label">Prestado</span>
           <span class="date-value">${borrowDate}</span>
         </div>
         <div class="borrowed-item-date">
-          <span class="date-label">${t('dueDate')}</span>
+          <span class="date-label">Vencimiento</span>
           <span class="date-value ${isOverdue ? 'date-overdue' : ''}">${dueDateStr}</span>
         </div>
       </div>
     </div>
     <div class="borrowed-item-actions">
-      <button class="btn-primary" onclick="returnBook(${borrowing.book_id})">${t('returnBook')}</button>
+      <button class="btn-primary" onclick="returnBook(${borrowing.book_id})">Devolver</button>
     </div>
   `;
 
@@ -601,7 +601,7 @@ async function returnBook(bookId) {
     }
   } catch (error) {
     console.error('Error returning book:', error);
-    showError(t('connectionError'));
+    showError('Error de conexión');
   }
 }
 
@@ -637,11 +637,11 @@ async function loadBooks() {
       currentBooks = result.data;
       renderBooks(currentBooks);
     } else {
-      showError(t('errorLoading') + ': ' + result.error);
+      showError('Error cargando libros: ' + result.error);
     }
   } catch (error) {
     console.error('Error loading books:', error);
-    showError(t('connectionError'));
+    showError('Error de conexión al cargar los libros');
   }
 }
 
@@ -699,7 +699,7 @@ function createBookCard(book) {
     </div>
     <div class="book-info">
       <div class="book-title">${escapeHtml(book.title)}</div>
-      <div class="book-author">${escapeHtml(book.author || t('unknownAuthor'))}</div>
+      <div class="book-author">${escapeHtml(book.author || 'Autor desconocido')}</div>
       <div class="book-meta">
         <span>${book.published_date ? new Date(book.published_date).getFullYear() : ''}</span>
         <span>${book.page_count ? book.page_count + ' pág.' : ''}</span>
@@ -734,11 +734,11 @@ async function handleSearch() {
     if (result.success) {
       renderBooks(result.data);
     } else {
-      showError(t('errorSearching') + ': ' + result.error);
+      showError('Error en la búsqueda: ' + result.error);
     }
   } catch (error) {
     console.error('Error searching:', error);
-    showError(t('connectionError'));
+    showError('Error de conexión en la búsqueda');
   }
 }
 
@@ -780,7 +780,7 @@ async function startCamera() {
     document.querySelector('.upload-area').style.display = 'none';
   } catch (error) {
     console.error('Error accessing camera:', error);
-    alert(t('cameraError'));
+    alert('No se pudo acceder a la cámara. Por favor, permite el acceso o sube una imagen.');
   }
 }
 
@@ -801,7 +801,7 @@ function showManualEntryForm() {
 
   // Show info message
   showRecognitionStatus(
-    t('manualEntryHelp'),
+    'Entrada manual: Completa los campos que conozcas y usa "Autocompletar" para buscar el resto.',
     'info'
   );
 
@@ -870,17 +870,17 @@ async function uploadImage(file) {
       showBookDetailsForm(result);
     } else if (response.status === 409) {
       // Book already exists
-      showRecognitionStatus(t('bookAlreadyExists'), 'error');
+      showRecognitionStatus('Este libro ya existe en la biblioteca', 'error');
       setTimeout(() => {
         closeAddBookModal();
       }, 2000);
     } else {
-      showError(t('errorUploading') + ': ' + result.error);
+      showError('Error subiendo imagen: ' + result.error);
     }
   } catch (error) {
     console.error('Error uploading image:', error);
     document.getElementById('uploadProgress').style.display = 'none';
-    showError(t('connectionError'));
+    showError('Error de conexión al subir la imagen');
   }
 }
 
@@ -893,9 +893,9 @@ function showBookDetailsForm(result) {
 
   // Show recognition status
   if (result.recognized) {
-    showRecognitionStatus(t('infoCompleted'), 'success');
+    showRecognitionStatus('¡Libro reconocido automáticamente! Verifica los datos.', 'success');
   } else {
-    showRecognitionStatus(t('bookNotRecognized'), 'warning');
+    showRecognitionStatus('No se pudo reconocer el libro. Por favor, ingresa los datos manualmente.', 'warning');
   }
 
   // Populate form
@@ -937,7 +937,7 @@ async function autoCompleteBookData() {
 
     // Check if at least one field has data
     if (!partialData.title && !partialData.author && !partialData.isbn) {
-      showRecognitionStatus(t('enterTitleOrISBN'), 'warning');
+      showRecognitionStatus('Por favor, ingresa al menos el título, autor o ISBN para autocompletar.', 'warning');
       return;
     }
 
@@ -945,9 +945,9 @@ async function autoCompleteBookData() {
     const autoCompleteBtn = document.getElementById('autoCompleteBtn');
     const originalText = autoCompleteBtn.textContent;
     autoCompleteBtn.disabled = true;
-    autoCompleteBtn.textContent = t('searching');
+    autoCompleteBtn.textContent = '🔄 Buscando...';
 
-    showRecognitionStatus(t('searchingBookInfo'), 'info');
+    showRecognitionStatus('Buscando información del libro...', 'info');
 
     // Call the complete API
     const response = await fetch(`${API_BASE}/books/complete`, {
@@ -1010,17 +1010,17 @@ async function autoCompleteBookData() {
         document.getElementById('bookGoogleId').value = completedData.google_books_id;
       }
 
-      showRecognitionStatus(t('infoCompleted'), 'success');
+      showRecognitionStatus('✅ Información completada exitosamente. Verifica los datos.', 'success');
     } else {
-      showRecognitionStatus(t('infoNotFound'), 'warning');
+      showRecognitionStatus('⚠️ No se encontró información adicional. Intenta con datos más específicos.', 'warning');
     }
   } catch (error) {
     console.error('Error auto-completing book data:', error);
-    showRecognitionStatus(t('errorSearchingInfo'), 'error');
+    showRecognitionStatus('❌ Error al buscar información. Por favor, intenta de nuevo.', 'error');
 
     const autoCompleteBtn = document.getElementById('autoCompleteBtn');
     autoCompleteBtn.disabled = false;
-    autoCompleteBtn.textContent = t('autocomplete');
+    autoCompleteBtn.textContent = '🔍 Autocompletar Datos';
   }
 }
 
@@ -1059,11 +1059,11 @@ async function handleBookSubmit(event) {
       loadBooks();
       loadStats();
     } else {
-      showError(t('errorSaving') + ': ' + result.error);
+      showError('Error guardando libro: ' + result.error);
     }
   } catch (error) {
     console.error('Error saving book:', error);
-    showError(t('connectionError'));
+    showError('Error de conexión al guardar el libro');
   }
 }
 
@@ -1076,11 +1076,11 @@ async function openBookDetail(bookId) {
     if (result.success) {
       showBookDetailModal(result.data);
     } else {
-      showError(t('errorLoading') + ': ' + result.error);
+      showError('Error cargando detalles: ' + result.error);
     }
   } catch (error) {
     console.error('Error loading book details:', error);
-    showError(t('connectionError'));
+    showError('Error de conexión al cargar detalles');
   }
 }
 
@@ -1099,7 +1099,7 @@ function showBookDetailModal(book) {
       </div>
       <div class="book-detail-info">
         <h3>${escapeHtml(book.title)}</h3>
-        <div class="book-detail-author">${escapeHtml(book.author || t('unknownAuthor'))}</div>
+        <div class="book-detail-author">${escapeHtml(book.author || 'Autor desconocido')}</div>
 
         <div class="book-detail-meta">
           ${book.isbn ? `
@@ -1110,31 +1110,31 @@ function showBookDetailModal(book) {
           ` : ''}
           ${book.publisher ? `
           <div class="meta-item">
-            <div class="meta-label">${t('publisher')}</div>
+            <div class="meta-label">Editorial</div>
             <div class="meta-value">${escapeHtml(book.publisher)}</div>
           </div>
           ` : ''}
           ${book.published_date ? `
           <div class="meta-item">
-            <div class="meta-label">${t('publishedDate')}</div>
+            <div class="meta-label">Fecha de Publicación</div>
             <div class="meta-value">${escapeHtml(book.published_date)}</div>
           </div>
           ` : ''}
           ${book.page_count ? `
           <div class="meta-item">
-            <div class="meta-label">${t('pageCount')}</div>
+            <div class="meta-label">Páginas</div>
             <div class="meta-value">${book.page_count}</div>
           </div>
           ` : ''}
           ${book.language ? `
           <div class="meta-item">
-            <div class="meta-label">${t('language')}</div>
+            <div class="meta-label">Idioma</div>
             <div class="meta-value">${escapeHtml(book.language).toUpperCase()}</div>
           </div>
           ` : ''}
           ${book.categories ? `
           <div class="meta-item">
-            <div class="meta-label">${t('categories')}</div>
+            <div class="meta-label">Categorías</div>
             <div class="meta-value">${escapeHtml(book.categories)}</div>
           </div>
           ` : ''}
@@ -1142,23 +1142,23 @@ function showBookDetailModal(book) {
 
         ${book.description ? `
         <div class="book-detail-description">
-          <h4>${t('description')}</h4>
+          <h4>Descripción</h4>
           <p>${escapeHtml(book.description)}</p>
         </div>
         ` : ''}
 
         <div class="book-detail-actions">
           ${currentUser && book.added_by_user_id === currentUser.id ? `
-            <button class="btn-danger" onclick="deleteBook(${book.id})">${t('deleteBook')}</button>
+            <button class="btn-danger" onclick="deleteBook(${book.id})">Eliminar Libro</button>
           ` : ''}
           ${currentUser && book.status === 'available' ? `
-            <button class="btn-primary" onclick="borrowBook(${book.id})">${t('borrowBook')}</button>
+            <button class="btn-primary" onclick="borrowBook(${book.id})">Prestar Libro</button>
           ` : ''}
           ${book.status === 'borrowed' ? `
-            <span class="book-status status-borrowed">${t('borrowed')}</span>
+            <span class="book-status status-borrowed">Prestado</span>
           ` : ''}
           ${!currentUser ? `
-            <p style="color: var(--text-secondary);">${t('loginRequired')}</p>
+            <p style="color: var(--text-secondary);">Inicia sesión para prestar libros</p>
           ` : ''}
         </div>
       </div>
@@ -1227,7 +1227,7 @@ async function deleteBook(bookId) {
     }
   } catch (error) {
     console.error('Error deleting book:', error);
-    showError(t('connectionError'));
+    showError('Error de conexión al eliminar el libro');
   }
 }
 

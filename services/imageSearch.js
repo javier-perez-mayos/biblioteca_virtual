@@ -37,45 +37,65 @@ class ImageSearchService {
    * Upload image to Google Lens and perform reverse image search
    */
   async reverseImageSearch(imagePath) {
+    let page = null;
     try {
-      console.log('Starting Google Lens reverse image search...');
+      console.log('=== Starting Google Lens reverse image search ===');
+      console.log('Image path:', imagePath);
+
       const browser = await this.initBrowser();
-      const page = await browser.newPage();
+      console.log('Browser initialized');
+
+      page = await browser.newPage();
+      console.log('New page created');
+
+      // Enable console logging from the page
+      page.on('console', msg => console.log('PAGE LOG:', msg.text()));
+      page.on('pageerror', error => console.log('PAGE ERROR:', error.message));
 
       // Set user agent to avoid detection
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-      // Read image and convert to base64
-      const imageBuffer = fs.readFileSync(imagePath);
-      const base64Image = imageBuffer.toString('base64');
-      const mimeType = imagePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      console.log('User agent set');
 
       // Use Google Lens upload endpoint directly
-      console.log('Uploading image to Google Lens...');
-      await page.goto('https://lens.google.com/upload', { waitUntil: 'networkidle0', timeout: 30000 });
+      console.log('Navigating to Google Lens upload page...');
+      await page.goto('https://lens.google.com/upload', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      console.log('Page loaded, current URL:', page.url());
 
       // Wait for file input to appear
+      console.log('Waiting for file input...');
       await page.waitForSelector('input[type="file"]', { timeout: 10000 });
+      console.log('File input found');
 
       // Upload the image file
       const fileInput = await page.$('input[type="file"]');
+      console.log('Uploading file...');
       await fileInput.uploadFile(imagePath);
+      console.log('File uploaded, waiting for processing...');
 
-      // Wait for results to load - Google Lens may take time to process
-      console.log('Waiting for Lens results...');
-      await page.waitForTimeout(5000);
+      // Wait for results to load - use setTimeout instead of waitForTimeout
+      await new Promise(resolve => setTimeout(resolve, 8000));
+      console.log('Wait complete, current URL:', page.url());
 
-      // Try to wait for specific result elements
+      // Take a screenshot for debugging
+      const screenshotPath = 'debug-lens-' + Date.now() + '.png';
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+      console.log('Screenshot saved to:', screenshotPath);
+
+      // Try to wait for navigation or results
       try {
-        await page.waitForSelector('a[href*="amazon"], a[href*="goodreads"], [class*="result"], [class*="product"]', { timeout: 10000 });
+        console.log('Checking if page has results...');
+        await page.waitForSelector('a[href*="amazon"], a[href*="goodreads"], a[href*="books"], div[role="link"]', { timeout: 5000 });
+        console.log('Found result elements');
       } catch (e) {
-        console.log('No specific result selectors found, proceeding with page scraping...');
+        console.log('No specific result selectors found after upload, proceeding with page scraping...');
       }
 
-      // Take a screenshot for debugging if needed
-      // await page.screenshot({ path: 'debug-lens.png', fullPage: true });
+      // Get page content
+      const htmlContent = await page.content();
+      console.log('Page HTML length:', htmlContent.length);
 
       // Extract search results from Google Lens
+      console.log('Extracting results from page...');
       const results = await page.evaluate(() => {
         const data = {
           bestGuess: '',
@@ -83,24 +103,38 @@ class ImageSearchService {
           links: [],
           amazonLinks: [],
           goodreadsLinks: [],
-          textContent: document.body.textContent
+          allText: []
         };
 
         // Try to find the main title/best guess in various places
         const titleSelectors = [
-          'h1', 'h2', '[class*="title"]', '[class*="heading"]',
-          '[data-text-content]', '[class*="product-title"]'
+          'h1', 'h2', 'h3', '[class*="title"]', '[class*="heading"]',
+          '[data-text-content]', '[class*="product"]', '[role="heading"]'
         ];
 
+        console.log('Searching for titles...');
         for (const selector of titleSelectors) {
           const elements = document.querySelectorAll(selector);
+          if (elements.length > 0) {
+            console.log(`Found ${elements.length} elements for selector: ${selector}`);
+          }
           elements.forEach(el => {
             const text = el.textContent.trim();
             if (text && text.length > 5 && text.length < 200 && !data.titles.includes(text)) {
               data.titles.push(text);
+              console.log('Found title:', text);
             }
           });
         }
+
+        // Get all text content
+        const allElements = document.querySelectorAll('div, span, p, a');
+        allElements.forEach(el => {
+          const text = el.textContent.trim();
+          if (text && text.length > 10 && text.length < 150) {
+            data.allText.push(text);
+          }
+        });
 
         // Set best guess from first title
         if (data.titles.length > 0) {
@@ -108,17 +142,23 @@ class ImageSearchService {
         }
 
         // Get all links
+        console.log('Searching for links...');
         const linkElements = document.querySelectorAll('a[href]');
+        console.log(`Found ${linkElements.length} total links`);
+
         linkElements.forEach(link => {
           const href = link.href;
+          const text = link.textContent.trim();
 
           if (href.includes('amazon.') && !data.amazonLinks.includes(href)) {
+            console.log('Found Amazon link:', href);
             data.amazonLinks.push(href);
           } else if (href.includes('goodreads.com') && !data.goodreadsLinks.includes(href)) {
+            console.log('Found Goodreads link:', href);
             data.goodreadsLinks.push(href);
           }
 
-          if (href && !href.includes('google.com') && !href.includes('lens.google')) {
+          if (href && !href.includes('google.com') && !href.includes('lens.google') && !href.startsWith('javascript:')) {
             if (!data.links.includes(href)) {
               data.links.push(href);
             }
@@ -128,26 +168,22 @@ class ImageSearchService {
         return data;
       });
 
-      console.log('Reverse image search results:', {
-        bestGuess: results.bestGuess,
-        titlesFound: results.titles.length,
-        amazonLinksFound: results.amazonLinks.length,
-        goodreadsLinksFound: results.goodreadsLinks.length,
-        totalLinks: results.links.length
-      });
+      console.log('=== Reverse image search results ===');
+      console.log('Best guess:', results.bestGuess);
+      console.log('Titles found:', results.titles.length, results.titles.slice(0, 5));
+      console.log('Amazon links:', results.amazonLinks.length, results.amazonLinks);
+      console.log('Goodreads links:', results.goodreadsLinks.length, results.goodreadsLinks);
+      console.log('Total external links:', results.links.length);
+      console.log('Sample text:', results.allText.slice(0, 10));
 
-      // If no results from Lens, try extracting from text content
-      if (!results.bestGuess && results.textContent) {
-        // Look for book patterns in text
-        const bookPatterns = [
-          /(?:book|title)[:]\s*([^,\n]+)/i,
-          /by\s+([A-Z][a-z]+\s+[A-Z][a-z]+)/
-        ];
-
-        for (const pattern of bookPatterns) {
-          const match = results.textContent.match(pattern);
-          if (match && match[1]) {
-            results.bestGuess = match[1].trim();
+      // If no results from Lens, try extracting book title from text
+      if (!results.bestGuess && results.allText.length > 0) {
+        console.log('No best guess found, trying to extract from text...');
+        // Look for book-like titles (capitalized words)
+        for (const text of results.allText) {
+          if (/^[A-Z][a-z]+(\s+[A-Z][a-z]+)+/.test(text) && text.length > 10) {
+            results.bestGuess = text;
+            console.log('Extracted title from text:', text);
             break;
           }
         }
@@ -155,7 +191,21 @@ class ImageSearchService {
 
       return results;
     } catch (error) {
-      console.error('Error in reverse image search:', error.message);
+      console.error('!!! Error in reverse image search !!!');
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+
+      // Try to get page state on error
+      if (page) {
+        try {
+          console.log('Page URL on error:', await page.url());
+          await page.screenshot({ path: 'error-lens-' + Date.now() + '.png' });
+          console.log('Error screenshot saved');
+        } catch (e) {
+          console.log('Could not capture error state');
+        }
+      }
+
       return null;
     }
   }

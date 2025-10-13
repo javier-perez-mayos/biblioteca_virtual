@@ -126,8 +126,17 @@ class BookRecognitionService {
     try {
       console.log('Starting enhanced book recognition...');
 
-      // STEP 1: Try Google Vision API for image-based search (most accurate)
-      console.log('Step 1: Attempting Google Vision API image search...');
+      // STEP 1: Try Google Reverse Image Search (most accurate for book covers)
+      console.log('Step 1: Attempting Google reverse image search with web scraping...');
+      const imageSearchResult = await imageSearch.searchByImage(imagePath);
+
+      if (imageSearchResult && imageSearchResult.title) {
+        console.log('Book found via reverse image search:', imageSearchResult.title);
+        return { ...imageSearchResult, recognitionMethod: 'reverse_image_search' };
+      }
+
+      // STEP 2: Try Google Vision API as fallback
+      console.log('Step 2: Attempting Google Vision API image search...');
       const visionResult = await imageSearch.searchByImageVision(imagePath);
 
       if (visionResult) {
@@ -149,12 +158,12 @@ class BookRecognitionService {
         }
       }
 
-      // STEP 2: Try OCR to extract text from image
-      console.log('Step 2: Attempting OCR text extraction...');
+      // STEP 3: Try OCR to extract text from image
+      console.log('Step 3: Attempting OCR text extraction...');
       const extractedText = await this.extractTextFromImage(imagePath);
       console.log('Extracted text:', extractedText.substring(0, 200));
 
-      // STEP 3: Try to find ISBN from OCR text
+      // STEP 4: Try to find ISBN from OCR text
       const isbn = this.extractISBN(extractedText);
 
       if (isbn) {
@@ -166,7 +175,7 @@ class BookRecognitionService {
         }
       }
 
-      // STEP 4: If no ISBN found, try to extract title from OCR text
+      // STEP 5: If no ISBN found, try to extract title from OCR text
       const lines = extractedText.split('\n').filter(line => line.trim().length > 0);
       if (lines.length > 0) {
         // Assume first non-empty lines might be the title

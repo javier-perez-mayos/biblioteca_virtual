@@ -1,13 +1,372 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
 
 class ImageSearchService {
   constructor() {
     this.googleVisionApiKey = process.env.GOOGLE_VISION_API_KEY;
+    this.browser = null;
   }
 
   /**
-   * Use Google Vision API to detect web entities and similar images
+   * Initialize browser for web scraping
+   */
+  async initBrowser() {
+    if (!this.browser) {
+      this.browser = await puppeteer.launch({
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+    }
+    return this.browser;
+  }
+
+  /**
+   * Close browser
+   */
+  async closeBrowser() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+
+  /**
+   * Upload image to Google and perform reverse image search
+   */
+  async reverseImageSearch(imagePath) {
+    try {
+      console.log('Starting Google reverse image search...');
+      const browser = await this.initBrowser();
+      const page = await browser.newPage();
+
+      // Set user agent to avoid detection
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+      // Navigate to Google Images
+      await page.goto('https://images.google.com/', { waitUntil: 'networkidle2' });
+
+      // Click on camera icon for image search
+      try {
+        await page.waitForSelector('div[aria-label*="Search by image"]', { timeout: 5000 });
+        await page.click('div[aria-label*="Search by image"]');
+      } catch (e) {
+        console.log('Trying alternative selector for image search button...');
+        await page.click('[aria-label="Search by image"]');
+      }
+
+      // Wait for upload tab
+      await page.waitForSelector('input[type="file"]', { timeout: 5000 });
+
+      // Upload the image
+      const input = await page.$('input[type="file"]');
+      await input.uploadFile(imagePath);
+
+      // Wait for results to load
+      await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 });
+
+      // Extract search results
+      const results = await page.evaluate(() => {
+        const data = {
+          bestGuess: '',
+          titles: [],
+          links: [],
+          amazonLinks: [],
+          goodreadsLinks: []
+        };
+
+        // Get "best guess" label
+        const bestGuessElement = document.querySelector('input[name="q"]');
+        if (bestGuessElement) {
+          data.bestGuess = bestGuessElement.value;
+        }
+
+        // Alternative best guess selectors
+        if (!data.bestGuess) {
+          const altGuess = document.querySelector('a.fKDtNb');
+          if (altGuess) {
+            data.bestGuess = altGuess.textContent.trim();
+          }
+        }
+
+        // Get all search result links
+        const linkElements = document.querySelectorAll('a[href]');
+        linkElements.forEach(link => {
+          const href = link.href;
+          const text = link.textContent.trim();
+
+          if (href.includes('amazon.') && !data.amazonLinks.includes(href)) {
+            data.amazonLinks.push(href);
+          } else if (href.includes('goodreads.com') && !data.goodreadsLinks.includes(href)) {
+            data.goodreadsLinks.push(href);
+          }
+
+          if (text && text.length > 10 && text.length < 200) {
+            data.titles.push(text);
+          }
+
+          if (href && !href.includes('google.com')) {
+            data.links.push(href);
+          }
+        });
+
+        return data;
+      });
+
+      console.log('Reverse image search results:', {
+        bestGuess: results.bestGuess,
+        amazonLinksFound: results.amazonLinks.length,
+        goodreadsLinksFound: results.goodreadsLinks.length
+      });
+
+      return results;
+    } catch (error) {
+      console.error('Error in reverse image search:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Scrape book details from Amazon product page
+   */
+  async scrapeAmazon(url) {
+    try {
+      console.log('Scraping Amazon:', url);
+      const browser = await this.initBrowser();
+      const page = await browser.newPage();
+
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      const bookData = await page.evaluate(() => {
+        const data = {
+          title: '',
+          author: '',
+          publisher: '',
+          isbn: '',
+          description: '',
+          pageCount: 0,
+          publishedDate: ''
+        };
+
+        // Title
+        const titleEl = document.querySelector('#productTitle, h1[id*="title"]');
+        if (titleEl) data.title = titleEl.textContent.trim();
+
+        // Author
+        const authorEl = document.querySelector('.author a, .contributorNameID, a[data-a-target*="author"]');
+        if (authorEl) data.author = authorEl.textContent.trim();
+
+        // Details section
+        const detailsSection = document.querySelector('#detailBullets_feature_div, #detail-bullets, .detail-bullet-list');
+        if (detailsSection) {
+          const text = detailsSection.textContent;
+
+          // ISBN
+          const isbnMatch = text.match(/ISBN-13[:\s]+([0-9-]+)/i) || text.match(/ISBN[:\s]+([0-9-]+)/i);
+          if (isbnMatch) data.isbn = isbnMatch[1].replace(/-/g, '');
+
+          // Publisher
+          const publisherMatch = text.match(/Publisher[:\s]+([^;(]+)/i);
+          if (publisherMatch) data.publisher = publisherMatch[1].trim();
+
+          // Pages
+          const pagesMatch = text.match(/([0-9]+)\s+pages/i);
+          if (pagesMatch) data.pageCount = parseInt(pagesMatch[1]);
+
+          // Publication date
+          const dateMatch = text.match(/Publication date[:\s]+([A-Za-z]+\s+[0-9]+,\s+[0-9]+)/i);
+          if (dateMatch) data.publishedDate = dateMatch[1];
+        }
+
+        // Description
+        const descEl = document.querySelector('#bookDescription_feature_div, #feature-bullets');
+        if (descEl) data.description = descEl.textContent.trim().substring(0, 500);
+
+        return data;
+      });
+
+      console.log('Amazon scraping result:', bookData.title ? 'Success' : 'No data');
+      return bookData.title ? bookData : null;
+    } catch (error) {
+      console.error('Error scraping Amazon:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Scrape book details from Goodreads
+   */
+  async scrapeGoodreads(url) {
+    try {
+      console.log('Scraping Goodreads:', url);
+      const browser = await this.initBrowser();
+      const page = await browser.newPage();
+
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      const bookData = await page.evaluate(() => {
+        const data = {
+          title: '',
+          author: '',
+          publisher: '',
+          isbn: '',
+          description: '',
+          pageCount: 0,
+          publishedDate: '',
+          rating: 0
+        };
+
+        // Title
+        const titleEl = document.querySelector('h1[data-testid="bookTitle"], h1.Text');
+        if (titleEl) data.title = titleEl.textContent.trim();
+
+        // Author
+        const authorEl = document.querySelector('.ContributorLink__name, a.authorName');
+        if (authorEl) data.author = authorEl.textContent.trim();
+
+        // Rating
+        const ratingEl = document.querySelector('.RatingStatistics__rating, span[itemprop="ratingValue"]');
+        if (ratingEl) data.rating = parseFloat(ratingEl.textContent.trim());
+
+        // Details
+        const detailsText = document.body.textContent;
+
+        // ISBN
+        const isbnMatch = detailsText.match(/ISBN[:\s]+([0-9-]+)/i);
+        if (isbnMatch) data.isbn = isbnMatch[1].replace(/-/g, '');
+
+        // Pages
+        const pagesMatch = detailsText.match(/([0-9]+)\s+pages/i);
+        if (pagesMatch) data.pageCount = parseInt(pagesMatch[1]);
+
+        // Published
+        const publishedMatch = detailsText.match(/Published\s+([A-Za-z]+\s+[0-9]+,?\s+[0-9]+)/i);
+        if (publishedMatch) data.publishedDate = publishedMatch[1];
+
+        const publisherMatch = detailsText.match(/by\s+([^(]+)\(/i);
+        if (publisherMatch) data.publisher = publisherMatch[1].trim();
+
+        // Description
+        const descEl = document.querySelector('.BookPageMetadataSection__description, #description');
+        if (descEl) data.description = descEl.textContent.trim().substring(0, 500);
+
+        return data;
+      });
+
+      console.log('Goodreads scraping result:', bookData.title ? 'Success' : 'No data');
+      return bookData.title ? bookData : null;
+    } catch (error) {
+      console.error('Error scraping Goodreads:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Main function to search book by cover image
+   */
+  async searchByImage(imagePath) {
+    try {
+      console.log('Starting book search by cover image...');
+
+      // Step 1: Perform reverse image search
+      const searchResults = await this.reverseImageSearch(imagePath);
+
+      if (!searchResults) {
+        console.log('Reverse image search failed');
+        return null;
+      }
+
+      let bookData = null;
+
+      // Step 2: Try to scrape Amazon links first
+      if (searchResults.amazonLinks.length > 0) {
+        for (const amazonUrl of searchResults.amazonLinks.slice(0, 3)) {
+          bookData = await this.scrapeAmazon(amazonUrl);
+          if (bookData && bookData.title) {
+            console.log('Successfully scraped book data from Amazon');
+            break;
+          }
+        }
+      }
+
+      // Step 3: Try Goodreads if Amazon didn't work
+      if (!bookData && searchResults.goodreadsLinks.length > 0) {
+        for (const goodreadsUrl of searchResults.goodreadsLinks.slice(0, 2)) {
+          bookData = await this.scrapeGoodreads(goodreadsUrl);
+          if (bookData && bookData.title) {
+            console.log('Successfully scraped book data from Goodreads');
+            break;
+          }
+        }
+      }
+
+      // Step 4: If scraping failed, use Google's best guess
+      if (!bookData && searchResults.bestGuess) {
+        console.log('Using Google best guess:', searchResults.bestGuess);
+        bookData = {
+          title: this.extractTitleFromGuess(searchResults.bestGuess),
+          author: this.extractAuthorFromGuess(searchResults.bestGuess),
+          description: '',
+          isbn: '',
+          publisher: '',
+          pageCount: 0,
+          publishedDate: ''
+        };
+      }
+
+      // Step 5: Try to complete data using Google Books API
+      if (bookData && bookData.title) {
+        const completedData = await this.searchGoogleBooksByPartialInfo(bookData);
+        if (completedData && completedData.length > 0) {
+          // Merge scraped data with Google Books data
+          return {
+            ...completedData[0],
+            // Keep scraped data as priority for certain fields
+            ...(bookData.description && { description: bookData.description }),
+            ...(bookData.rating && { rating: bookData.rating })
+          };
+        }
+        return bookData;
+      }
+
+      console.log('Could not extract book information from image search');
+      return null;
+    } catch (error) {
+      console.error('Error in image search:', error);
+      return null;
+    } finally {
+      // Keep browser open for subsequent searches, will be closed when service stops
+    }
+  }
+
+  /**
+   * Extract title from Google's best guess
+   */
+  extractTitleFromGuess(guess) {
+    // Remove common patterns
+    let title = guess.replace(/\s*by\s+.*/i, '');
+    title = title.replace(/\s*-\s+.*/i, '');
+    title = title.replace(/^book:\s*/i, '');
+    return title.trim();
+  }
+
+  /**
+   * Extract author from Google's best guess
+   */
+  extractAuthorFromGuess(guess) {
+    const byMatch = guess.match(/by\s+([^-]+)/i);
+    if (byMatch) {
+      return byMatch[1].trim();
+    }
+    return '';
+  }
+
+  /**
+   * Use Google Vision API to detect web entities and similar images (fallback method)
    */
   async searchByImageVision(imagePath) {
     if (!this.googleVisionApiKey) {
@@ -16,7 +375,6 @@ class ImageSearchService {
     }
 
     try {
-      const fs = require('fs');
       const imageBuffer = fs.readFileSync(imagePath);
       const base64Image = imageBuffer.toString('base64');
 
@@ -55,45 +413,6 @@ class ImageSearchService {
       return bookInfo;
     } catch (error) {
       console.error('Error in Google Vision API search:', error.message);
-      return null;
-    }
-  }
-
-  /**
-   * Search for book using SerpApi Google Images (alternative to Vision API)
-   */
-  async searchByImageUrl(imageUrl) {
-    try {
-      // Use Google Reverse Image Search
-      const searchUrl = `https://www.google.com/searchbyimage?image_url=${encodeURIComponent(imageUrl)}&encoded_image=&image_content=&filename=&hl=en`;
-
-      const response = await axios.get(searchUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        timeout: 10000
-      });
-
-      const $ = cheerio.load(response.data);
-
-      // Try to extract book title and author from search results
-      const results = {
-        title: '',
-        possibleTitles: [],
-        possibleAuthors: []
-      };
-
-      // Look for book-related text in the results
-      $('h3, .title, .product-title').each((i, elem) => {
-        const text = $(elem).text().trim();
-        if (text.length > 0 && text.length < 200) {
-          results.possibleTitles.push(text);
-        }
-      });
-
-      return results.possibleTitles.length > 0 ? results : null;
-    } catch (error) {
-      console.error('Error in image URL search:', error.message);
       return null;
     }
   }

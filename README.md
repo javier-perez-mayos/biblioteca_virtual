@@ -6,10 +6,11 @@ A modern web application for managing an online library with automatic book reco
 
 ### Book Management
 - **📸 Advanced Book Recognition**: Multiple recognition methods for maximum accuracy
-  - Google Vision API for image-based search
-  - OCR (Tesseract.js) for text extraction from covers
-  - ISBN detection and lookup
-  - Title/author extraction and matching
+  - **Google Reverse Image Search** (primary method): Uploads cover photo to Google Images and scrapes book details from Amazon and Goodreads
+  - Google Vision API for image-based search (fallback)
+  - OCR (Tesseract.js) for text extraction from covers (fallback)
+  - ISBN detection and lookup (fallback)
+  - Title/author extraction and matching (fallback)
 - **✍️ Manual Entry with Auto-Complete**: Enter just the title or ISBN, and auto-complete the rest
 - **🤖 Automatic Metadata**: Automatically fetches book information from Google Books API
 - **🔍 Search & Filter**: Search books by title, author, ISBN, or categories
@@ -45,11 +46,12 @@ A modern web application for managing an online library with automatic book reco
 - Bcrypt for password hashing
 - Express-session for session management
 - Express-validator for input validation
-- Tesseract.js for OCR text extraction
-- Google Vision API for advanced image recognition (optional)
+- **Puppeteer** for Google reverse image search and web scraping
+- Cheerio for HTML parsing
+- Tesseract.js for OCR text extraction (fallback)
+- Google Vision API for advanced image recognition (optional fallback)
 - Sharp for image processing (book covers and profile pictures)
-- Google Books API for book metadata
-- Cheerio for web scraping fallback
+- Google Books API for book metadata enrichment
 - Multer for file uploads
 
 ### Frontend

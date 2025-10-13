@@ -189,6 +189,147 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * PUT /api/auth/profile - Update user profile
+ */
+app.put('/api/auth/profile', requireAuth, [
+  body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+  body('postal_address').optional().trim().notEmpty().withMessage('Postal address cannot be empty'),
+  body('telephone').optional().trim().notEmpty().withMessage('Telephone cannot be empty')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const result = await authService.updateUser(req.userId, req.body);
+
+    if (result.changes > 0) {
+      const updatedUser = await authService.getUserById(req.userId);
+      res.json({
+        success: true,
+        data: updatedUser,
+        message: 'Profile updated successfully'
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'No changes made'
+      });
+    }
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/change-password - Change password
+ */
+app.post('/api/auth/change-password', requireAuth, [
+  body('oldPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    await authService.changePassword(
+      req.userId,
+      req.body.oldPassword,
+      req.body.newPassword
+    );
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/auth/profile-picture - Upload profile picture
+ */
+app.post('/api/auth/profile-picture', requireAuth, upload.single('picture'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    // Optimize profile picture
+    const optimizedPath = path.join(UPLOAD_DIR, 'profile-' + Date.now() + '.jpg');
+    await sharp(req.file.path)
+      .resize(300, 300, { fit: 'cover' })
+      .jpeg({ quality: 85 })
+      .toFile(optimizedPath);
+
+    // Delete original upload
+    fs.unlinkSync(req.file.path);
+
+    const profilePicturePath = '/uploads/' + path.basename(optimizedPath);
+
+    // Delete old profile picture if exists
+    const user = await authService.getUserById(req.userId);
+    if (user.profile_picture && user.profile_picture.startsWith('/uploads/')) {
+      const oldPath = path.join(__dirname, user.profile_picture);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Update user profile
+    await authService.updateUser(req.userId, {
+      profile_picture: profilePicturePath
+    });
+
+    res.json({
+      success: true,
+      data: { profile_picture: profilePicturePath },
+      message: 'Profile picture updated successfully'
+    });
+  } catch (error) {
+    console.error('Profile picture upload error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/auth/my-books - Get books added by current user
+ */
+app.get('/api/auth/my-books', requireAuth, async (req, res) => {
+  try {
+    const books = await db.getBooksByUser(req.userId);
+    res.json({
+      success: true,
+      data: books
+    });
+  } catch (error) {
+    console.error('Error fetching user books:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // ==================== Book Routes ====================
 
 /**

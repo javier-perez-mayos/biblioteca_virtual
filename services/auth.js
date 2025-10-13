@@ -92,7 +92,7 @@ class AuthService {
    */
   async getUserById(userId) {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT id, name, email, postal_address, telephone, created_date FROM users WHERE id = ?';
+      const sql = 'SELECT id, name, email, postal_address, telephone, profile_picture, created_date FROM users WHERE id = ?';
 
       db.db.get(sql, [userId], (err, user) => {
         if (err) {
@@ -109,7 +109,7 @@ class AuthService {
    */
   async getUserByEmail(email) {
     return new Promise((resolve, reject) => {
-      const sql = 'SELECT id, name, email, postal_address, telephone, created_date FROM users WHERE email = ?';
+      const sql = 'SELECT id, name, email, postal_address, telephone, profile_picture, created_date FROM users WHERE email = ?';
 
       db.db.get(sql, [email], (err, user) => {
         if (err) {
@@ -141,9 +141,13 @@ class AuthService {
         fields.push('telephone = ?');
         params.push(userData.telephone);
       }
-      if (userData.password !== undefined) {
-        fields.push('password = ?');
-        params.push(bcrypt.hashSync(userData.password, 10));
+      if (userData.profile_picture !== undefined) {
+        fields.push('profile_picture = ?');
+        params.push(userData.profile_picture);
+      }
+
+      if (fields.length === 0) {
+        return resolve({ id: userId, changes: 0 });
       }
 
       params.push(userId);
@@ -157,6 +161,54 @@ class AuthService {
           resolve({ id: userId, changes: this.changes });
         }
       });
+    });
+  }
+
+  /**
+   * Change user password
+   */
+  async changePassword(userId, oldPassword, newPassword) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // First get the user to verify old password
+        const sql = 'SELECT password FROM users WHERE id = ?';
+
+        db.db.get(sql, [userId], async (err, user) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+
+          if (!user) {
+            reject(new Error('User not found'));
+            return;
+          }
+
+          // Verify old password
+          const validPassword = await bcrypt.compare(oldPassword, user.password);
+
+          if (!validPassword) {
+            reject(new Error('Current password is incorrect'));
+            return;
+          }
+
+          // Hash new password
+          const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+          // Update password
+          const updateSql = 'UPDATE users SET password = ? WHERE id = ?';
+
+          db.db.run(updateSql, [hashedPassword, userId], function(err) {
+            if (err) {
+              reject(err);
+            } else {
+              resolve({ success: true, changes: this.changes });
+            }
+          });
+        });
+      } catch (error) {
+        reject(error);
+      }
     });
   }
 }

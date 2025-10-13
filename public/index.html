@@ -11,13 +11,37 @@
     <!-- Header -->
     <header class="header">
       <div class="container">
-        <h1 class="logo">📚 Biblioteca Virtual</h1>
+        <h1 class="logo" onclick="window.location.reload()">📚 Biblioteca Virtual</h1>
         <div class="header-actions">
           <div class="search-box">
             <input type="text" id="searchInput" placeholder="Buscar libros por título, autor o ISBN..." />
             <button id="searchBtn" class="btn-icon">🔍</button>
           </div>
-          <button id="addBookBtn" class="btn-primary">+ Agregar Libro</button>
+
+          <!-- Auth Buttons (shown when logged out) -->
+          <div id="authButtons" style="display: none;">
+            <button id="loginBtn" class="btn-secondary">Iniciar Sesión</button>
+            <button id="registerBtn" class="btn-primary">Registrarse</button>
+          </div>
+
+          <!-- User Menu (shown when logged in) -->
+          <div id="userMenu" style="display: none;">
+            <button id="addBookBtn" class="btn-primary">+ Agregar Libro</button>
+            <div class="user-dropdown">
+              <button class="user-button" id="userButton">
+                <img id="userAvatar" src="" alt="User" class="user-avatar" />
+                <span id="userName"></span>
+                <span class="dropdown-arrow">▼</span>
+              </button>
+              <div class="dropdown-menu" id="userDropdown">
+                <a href="#" id="profileLink">Mi Perfil</a>
+                <a href="#" id="myBooksLink">Mis Libros</a>
+                <a href="#" id="borrowedBooksLink">Libros Prestados</a>
+                <hr />
+                <a href="#" id="logoutLink">Cerrar Sesión</a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -171,6 +195,185 @@
         </div>
         <div class="modal-body" id="bookDetailContent">
           <!-- Content populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Iniciar Sesión</h2>
+          <button class="close-btn" onclick="closeLoginModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="loginForm">
+            <div class="form-group">
+              <label for="loginEmail">Email</label>
+              <input type="email" id="loginEmail" required />
+            </div>
+            <div class="form-group">
+              <label for="loginPassword">Contraseña</label>
+              <input type="password" id="loginPassword" required />
+            </div>
+            <div id="loginError" class="status-message status-error" style="display: none;"></div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" onclick="closeLoginModal()">Cancelar</button>
+              <button type="submit" class="btn-primary">Iniciar Sesión</button>
+            </div>
+          </form>
+          <p style="text-align: center; margin-top: 1rem;">
+            ¿No tienes cuenta? <a href="#" onclick="closeLoginModal(); openRegisterModal()">Regístrate aquí</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>Registrarse</h2>
+          <button class="close-btn" onclick="closeRegisterModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="registerForm">
+            <div class="form-group">
+              <label for="regName">Nombre Completo *</label>
+              <input type="text" id="regName" required />
+            </div>
+            <div class="form-group">
+              <label for="regEmail">Email *</label>
+              <input type="email" id="regEmail" required />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="regPassword">Contraseña *</label>
+                <input type="password" id="regPassword" minlength="6" required />
+              </div>
+              <div class="form-group">
+                <label for="regPasswordConfirm">Confirmar Contraseña *</label>
+                <input type="password" id="regPasswordConfirm" minlength="6" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="regAddress">Dirección Postal *</label>
+              <textarea id="regAddress" rows="2" required></textarea>
+            </div>
+            <div class="form-group">
+              <label for="regPhone">Teléfono *</label>
+              <input type="tel" id="regPhone" required />
+            </div>
+            <div id="registerError" class="status-message status-error" style="display: none;"></div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" onclick="closeRegisterModal()">Cancelar</button>
+              <button type="submit" class="btn-primary">Crear Cuenta</button>
+            </div>
+          </form>
+          <p style="text-align: center; margin-top: 1rem;">
+            ¿Ya tienes cuenta? <a href="#" onclick="closeRegisterModal(); openLoginModal()">Inicia sesión aquí</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal">
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2>Mi Perfil</h2>
+          <button class="close-btn" onclick="closeProfileModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- Profile Tabs -->
+          <div class="profile-tabs">
+            <button class="tab-btn active" data-tab="info">Información</button>
+            <button class="tab-btn" data-tab="password">Cambiar Contraseña</button>
+            <button class="tab-btn" data-tab="my-books">Mis Libros</button>
+            <button class="tab-btn" data-tab="borrowed">Libros Prestados</button>
+          </div>
+
+          <!-- Profile Info Tab -->
+          <div id="tab-info" class="tab-content active">
+            <div class="profile-picture-section">
+              <div class="profile-picture-preview">
+                <img id="profilePicturePreview" src="" alt="Profile" />
+              </div>
+              <input type="file" id="profilePictureInput" accept="image/*" style="display: none;" />
+              <button type="button" class="btn-secondary" onclick="document.getElementById('profilePictureInput').click()">Cambiar Foto</button>
+            </div>
+
+            <form id="profileForm">
+              <div class="form-group">
+                <label for="profileName">Nombre Completo</label>
+                <input type="text" id="profileName" required />
+              </div>
+              <div class="form-group">
+                <label for="profileEmail">Email</label>
+                <input type="email" id="profileEmail" readonly disabled />
+              </div>
+              <div class="form-group">
+                <label for="profileAddress">Dirección Postal</label>
+                <textarea id="profileAddress" rows="2" required></textarea>
+              </div>
+              <div class="form-group">
+                <label for="profilePhone">Teléfono</label>
+                <input type="tel" id="profilePhone" required />
+              </div>
+              <div id="profileUpdateStatus" class="status-message" style="display: none;"></div>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Guardar Cambios</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Change Password Tab -->
+          <div id="tab-password" class="tab-content">
+            <form id="passwordForm">
+              <div class="form-group">
+                <label for="currentPassword">Contraseña Actual</label>
+                <input type="password" id="currentPassword" required />
+              </div>
+              <div class="form-group">
+                <label for="newPassword">Nueva Contraseña</label>
+                <input type="password" id="newPassword" minlength="6" required />
+              </div>
+              <div class="form-group">
+                <label for="confirmNewPassword">Confirmar Nueva Contraseña</label>
+                <input type="password" id="confirmNewPassword" minlength="6" required />
+              </div>
+              <div id="passwordChangeStatus" class="status-message" style="display: none;"></div>
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">Cambiar Contraseña</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- My Books Tab -->
+          <div id="tab-my-books" class="tab-content">
+            <div id="myBooksLoading" class="loading-state" style="display: none;">
+              <div class="spinner"></div>
+              <p>Cargando libros...</p>
+            </div>
+            <div id="myBooksEmpty" class="empty-state" style="display: none;">
+              <div class="empty-icon">📚</div>
+              <p>No has agregado ningún libro todavía</p>
+            </div>
+            <div id="myBooksGrid" class="books-grid"></div>
+          </div>
+
+          <!-- Borrowed Books Tab -->
+          <div id="tab-borrowed" class="tab-content">
+            <div id="borrowedLoading" class="loading-state" style="display: none;">
+              <div class="spinner"></div>
+              <p>Cargando libros prestados...</p>
+            </div>
+            <div id="borrowedEmpty" class="empty-state" style="display: none;">
+              <div class="empty-icon">📖</div>
+              <p>No tienes libros prestados actualmente</p>
+            </div>
+            <div id="borrowedList" class="borrowed-list"></div>
+          </div>
         </div>
       </div>
     </div>

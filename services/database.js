@@ -280,6 +280,7 @@ class DatabaseService {
           VALUES (?, ?, ?, 'borrowed')
         `;
 
+        const db = this.db; // Capture db reference for nested callback
         this.db.run(insertSql, [bookId, userId, dueDate.toISOString()], function(err) {
           if (err) {
             reject(err);
@@ -291,7 +292,7 @@ class DatabaseService {
           // Update book status
           const updateSql = `UPDATE books SET status = 'borrowed' WHERE id = ?`;
 
-          this.db.run(updateSql, [bookId], (err) => {
+          db.run(updateSql, [bookId], (err) => {
             if (err) {
               reject(err);
             } else {
@@ -322,6 +323,7 @@ class DatabaseService {
         LIMIT 1
       `;
 
+      const db = this.db; // Capture db reference for nested callbacks
       this.db.get(findSql, [bookId, userId], (err, record) => {
         if (err) {
           reject(err);
@@ -340,7 +342,7 @@ class DatabaseService {
           WHERE id = ?
         `;
 
-        this.db.run(updateBorrowSql, [record.id], (err) => {
+        db.run(updateBorrowSql, [record.id], (err) => {
           if (err) {
             reject(err);
             return;
@@ -349,7 +351,7 @@ class DatabaseService {
           // Update book status
           const updateBookSql = `UPDATE books SET status = 'available' WHERE id = ?`;
 
-          this.db.run(updateBookSql, [bookId], (err) => {
+          db.run(updateBookSql, [bookId], (err) => {
             if (err) {
               reject(err);
             } else {

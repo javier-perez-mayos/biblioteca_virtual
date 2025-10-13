@@ -1,14 +1,14 @@
 // Global state
 let currentBooks = [];
 let cameraStream = null;
+let currentUser = null;
 
 // API Base URL
 const API_BASE = '/api';
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-  loadBooks();
-  loadStats();
+  checkAuthStatus();
   initializeEventListeners();
 });
 
@@ -20,8 +20,46 @@ function initializeEventListeners() {
     if (e.key === 'Enter') handleSearch();
   });
 
+  // Auth buttons
+  document.getElementById('loginBtn')?.addEventListener('click', openLoginModal);
+  document.getElementById('registerBtn')?.addEventListener('click', openRegisterModal);
+  document.getElementById('logoutLink')?.addEventListener('click', handleLogout);
+
+  // User dropdown
+  document.getElementById('userButton')?.addEventListener('click', toggleUserDropdown);
+  document.getElementById('profileLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openProfileModal();
+  });
+  document.getElementById('myBooksLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openProfileModal('my-books');
+  });
+  document.getElementById('borrowedBooksLink')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openProfileModal('borrowed');
+  });
+
+  // Auth forms
+  document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
+  document.getElementById('registerForm')?.addEventListener('submit', handleRegister);
+
+  // Profile forms
+  document.getElementById('profileForm')?.addEventListener('submit', handleProfileUpdate);
+  document.getElementById('passwordForm')?.addEventListener('submit', handlePasswordChange);
+  document.getElementById('profilePictureInput')?.addEventListener('change', handleProfilePictureUpload);
+
+  // Profile tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchProfileTab(btn.dataset.tab));
+  });
+
   // Add book modal
-  document.getElementById('addBookBtn').addEventListener('click', openAddBookModal);
+  const addBookBtn = document.getElementById('addBookBtn');
+  if (addBookBtn) {
+    addBookBtn.addEventListener('click', openAddBookModal);
+  }
+
   document.getElementById('takePictureBtn').addEventListener('click', startCamera);
   document.getElementById('uploadFileBtn').addEventListener('click', () => {
     document.getElementById('coverInput').click();
@@ -34,6 +72,499 @@ function initializeEventListeners() {
 
   // Book form
   document.getElementById('bookForm').addEventListener('submit', handleBookSubmit);
+
+  // Close dropdowns on outside click
+  document.addEventListener('click', (e) => {
+    const userDropdown = document.querySelector('.user-dropdown');
+    if (userDropdown && !userDropdown.contains(e.target)) {
+      userDropdown.classList.remove('active');
+    }
+  });
+}
+
+// ==================== Authentication ====================
+
+async function checkAuthStatus() {
+  try {
+    const response = await fetch(`${API_BASE}/auth/me`, {
+      credentials: 'include'
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      currentUser = result.data;
+      updateUIForAuth(true);
+    } else {
+      currentUser = null;
+      updateUIForAuth(false);
+    }
+  } catch (error) {
+    console.error('Auth check error:', error);
+    currentUser = null;
+    updateUIForAuth(false);
+  }
+
+  // Load books after auth check
+  loadBooks();
+  loadStats();
+}
+
+function updateUIForAuth(isAuthenticated) {
+  const authButtons = document.getElementById('authButtons');
+  const userMenu = document.getElementById('userMenu');
+
+  if (isAuthenticated && currentUser) {
+    authButtons.style.display = 'none';
+    userMenu.style.display = 'flex';
+
+    // Update user info
+    document.getElementById('userName').textContent = currentUser.name;
+    const userAvatar = document.getElementById('userAvatar');
+
+    if (currentUser.profile_picture) {
+      userAvatar.src = currentUser.profile_picture;
+      userAvatar.style.display = 'block';
+    } else {
+      userAvatar.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ffffff"%3E%3Cpath d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/%3E%3C/svg%3E';
+      userAvatar.style.display = 'block';
+    }
+  } else {
+    authButtons.style.display = 'flex';
+    userMenu.style.display = 'none';
+  }
+}
+
+function toggleUserDropdown(e) {
+  e.stopPropagation();
+  const dropdown = document.querySelector('.user-dropdown');
+  dropdown.classList.toggle('active');
+}
+
+// Login Modal
+function openLoginModal() {
+  document.getElementById('loginModal').classList.add('active');
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('loginForm').reset();
+}
+
+function closeLoginModal() {
+  document.getElementById('loginModal').classList.remove('active');
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      currentUser = result.data;
+      closeLoginModal();
+      updateUIForAuth(true);
+      loadBooks();
+      showSuccess('¡Bienvenido de vuelta!');
+    } else {
+      showError(result.error || 'Error al iniciar sesión', 'loginError');
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    showError('Error de conexión', 'loginError');
+  }
+}
+
+// Register Modal
+function openRegisterModal() {
+  document.getElementById('registerModal').classList.add('active');
+  document.getElementById('registerError').style.display = 'none';
+  document.getElementById('registerForm').reset();
+}
+
+function closeRegisterModal() {
+  document.getElementById('registerModal').classList.remove('active');
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+
+  const password = document.getElementById('regPassword').value;
+  const passwordConfirm = document.getElementById('regPasswordConfirm').value;
+
+  if (password !== passwordConfirm) {
+    showError('Las contraseñas no coinciden', 'registerError');
+    return;
+  }
+
+  const userData = {
+    name: document.getElementById('regName').value,
+    email: document.getElementById('regEmail').value,
+    password: password,
+    postal_address: document.getElementById('regAddress').value,
+    telephone: document.getElementById('regPhone').value
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(userData)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      currentUser = result.data;
+      closeRegisterModal();
+      updateUIForAuth(true);
+      loadBooks();
+      showSuccess('¡Cuenta creada exitosamente!');
+    } else {
+      const errorMsg = result.errors ? result.errors.map(e => e.msg).join(', ') : result.error;
+      showError(errorMsg || 'Error al registrarse', 'registerError');
+    }
+  } catch (error) {
+    console.error('Register error:', error);
+    showError('Error de conexión', 'registerError');
+  }
+}
+
+// Logout
+async function handleLogout(e) {
+  e.preventDefault();
+
+  try {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+
+    currentUser = null;
+    updateUIForAuth(false);
+    loadBooks();
+    showSuccess('Sesión cerrada');
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+}
+
+// ==================== Profile Management ====================
+
+function openProfileModal(tab = 'info') {
+  document.getElementById('profileModal').classList.add('active');
+  switchProfileTab(tab);
+  loadProfileData();
+}
+
+function closeProfileModal() {
+  document.getElementById('profileModal').classList.remove('active');
+}
+
+function switchProfileTab(tabName) {
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.toggle('active', content.id === `tab-${tabName}`);
+  });
+
+  // Load data for specific tabs
+  if (tabName === 'my-books') {
+    loadMyBooks();
+  } else if (tabName === 'borrowed') {
+    loadBorrowedBooks();
+  }
+}
+
+async function loadProfileData() {
+  if (!currentUser) return;
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/me`, {
+      credentials: 'include'
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      const user = result.data;
+
+      document.getElementById('profileName').value = user.name;
+      document.getElementById('profileEmail').value = user.email;
+      document.getElementById('profileAddress').value = user.postal_address;
+      document.getElementById('profilePhone').value = user.telephone;
+
+      const preview = document.getElementById('profilePicturePreview');
+      if (user.profile_picture) {
+        preview.src = user.profile_picture;
+      } else {
+        preview.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23667eea"%3E%3Cpath d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/%3E%3C/svg%3E';
+      }
+    }
+  } catch (error) {
+    console.error('Error loading profile:', error);
+  }
+}
+
+async function handleProfileUpdate(e) {
+  e.preventDefault();
+
+  const userData = {
+    name: document.getElementById('profileName').value,
+    postal_address: document.getElementById('profileAddress').value,
+    telephone: document.getElementById('profilePhone').value
+  };
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(userData)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      currentUser = result.data;
+      updateUIForAuth(true);
+      showStatusMessage('Perfil actualizado correctamente', 'success', 'profileUpdateStatus');
+    } else {
+      showStatusMessage(result.error || 'Error al actualizar perfil', 'error', 'profileUpdateStatus');
+    }
+  } catch (error) {
+    console.error('Profile update error:', error);
+    showStatusMessage('Error de conexión', 'error', 'profileUpdateStatus');
+  }
+}
+
+async function handlePasswordChange(e) {
+  e.preventDefault();
+
+  const newPassword = document.getElementById('newPassword').value;
+  const confirmPassword = document.getElementById('confirmNewPassword').value;
+
+  if (newPassword !== confirmPassword) {
+    showStatusMessage('Las nuevas contraseñas no coinciden', 'error', 'passwordChangeStatus');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        oldPassword: document.getElementById('currentPassword').value,
+        newPassword: newPassword
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      document.getElementById('passwordForm').reset();
+      showStatusMessage('Contraseña cambiada correctamente', 'success', 'passwordChangeStatus');
+    } else {
+      showStatusMessage(result.error || 'Error al cambiar contraseña', 'error', 'passwordChangeStatus');
+    }
+  } catch (error) {
+    console.error('Password change error:', error);
+    showStatusMessage('Error de conexión', 'error', 'passwordChangeStatus');
+  }
+}
+
+async function handleProfilePictureUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('picture', file);
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/profile-picture`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      document.getElementById('profilePicturePreview').src = result.data.profile_picture;
+      document.getElementById('userAvatar').src = result.data.profile_picture;
+      showSuccess('Foto de perfil actualizada');
+    } else {
+      showError(result.error || 'Error al subir foto');
+    }
+  } catch (error) {
+    console.error('Profile picture upload error:', error);
+    showError('Error de conexión');
+  }
+}
+
+async function loadMyBooks() {
+  const loading = document.getElementById('myBooksLoading');
+  const empty = document.getElementById('myBooksEmpty');
+  const grid = document.getElementById('myBooksGrid');
+
+  loading.style.display = 'block';
+  empty.style.display = 'none';
+  grid.innerHTML = '';
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/my-books`, {
+      credentials: 'include'
+    });
+
+    const result = await response.json();
+
+    loading.style.display = 'none';
+
+    if (result.success && result.data.length > 0) {
+      result.data.forEach(book => {
+        const card = createBookCard(book);
+        grid.appendChild(card);
+      });
+    } else {
+      empty.style.display = 'block';
+    }
+  } catch (error) {
+    console.error('Error loading my books:', error);
+    loading.style.display = 'none';
+    empty.style.display = 'block';
+  }
+}
+
+async function loadBorrowedBooks() {
+  const loading = document.getElementById('borrowedLoading');
+  const empty = document.getElementById('borrowedEmpty');
+  const list = document.getElementById('borrowedList');
+
+  loading.style.display = 'block';
+  empty.style.display = 'none';
+  list.innerHTML = '';
+
+  try {
+    const response = await fetch(`${API_BASE}/borrowings/my`, {
+      credentials: 'include'
+    });
+
+    const result = await response.json();
+
+    loading.style.display = 'none';
+
+    if (result.success && result.data.length > 0) {
+      result.data.forEach(borrowing => {
+        const item = createBorrowedItem(borrowing);
+        list.appendChild(item);
+      });
+    } else {
+      empty.style.display = 'block';
+    }
+  } catch (error) {
+    console.error('Error loading borrowed books:', error);
+    loading.style.display = 'none';
+    empty.style.display = 'block';
+  }
+}
+
+function createBorrowedItem(borrowing) {
+  const item = document.createElement('div');
+  item.className = 'borrowed-item';
+
+  const borrowDate = new Date(borrowing.borrow_date).toLocaleDateString();
+  const dueDate = new Date(borrowing.due_date);
+  const dueDateStr = dueDate.toLocaleDateString();
+  const isOverdue = dueDate < new Date();
+
+  const coverHtml = borrowing.cover_image
+    ? `<img src="${borrowing.cover_image}" alt="${borrowing.title}" />`
+    : '<div class="book-cover-placeholder">📖</div>';
+
+  item.innerHTML = `
+    <div class="borrowed-item-cover">
+      ${coverHtml}
+    </div>
+    <div class="borrowed-item-info">
+      <div class="borrowed-item-title">${escapeHtml(borrowing.title)}</div>
+      <div class="borrowed-item-author">${escapeHtml(borrowing.author || 'Autor desconocido')}</div>
+      <div class="borrowed-item-dates">
+        <div class="borrowed-item-date">
+          <span class="date-label">Prestado</span>
+          <span class="date-value">${borrowDate}</span>
+        </div>
+        <div class="borrowed-item-date">
+          <span class="date-label">Vencimiento</span>
+          <span class="date-value ${isOverdue ? 'date-overdue' : ''}">${dueDateStr}</span>
+        </div>
+      </div>
+    </div>
+    <div class="borrowed-item-actions">
+      <button class="btn-primary" onclick="returnBook(${borrowing.book_id})">Devolver</button>
+    </div>
+  `;
+
+  return item;
+}
+
+async function returnBook(bookId) {
+  if (!confirm('¿Confirmar devolución de este libro?')) return;
+
+  try {
+    const response = await fetch(`${API_BASE}/borrowings/return`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ book_id: bookId })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      showSuccess('Libro devuelto correctamente');
+      loadBorrowedBooks();
+      loadBooks();
+    } else {
+      showError(result.error || 'Error al devolver libro');
+    }
+  } catch (error) {
+    console.error('Error returning book:', error);
+    showError('Error de conexión');
+  }
+}
+
+function showStatusMessage(message, type, elementId) {
+  const statusEl = document.getElementById(elementId);
+  statusEl.textContent = message;
+  statusEl.className = `status-message status-${type}`;
+  statusEl.style.display = 'block';
+
+  setTimeout(() => {
+    statusEl.style.display = 'none';
+  }, 5000);
+}
+
+function showError(message, elementId = null) {
+  if (elementId) {
+    const errorEl = document.getElementById(elementId);
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+  } else {
+    alert(message);
+  }
 }
 
 // Load books from API
@@ -559,7 +1090,18 @@ function showBookDetailModal(book) {
         ` : ''}
 
         <div class="book-detail-actions">
-          <button class="btn-danger" onclick="deleteBook(${book.id})">Eliminar Libro</button>
+          ${currentUser && book.added_by_user_id === currentUser.id ? `
+            <button class="btn-danger" onclick="deleteBook(${book.id})">Eliminar Libro</button>
+          ` : ''}
+          ${currentUser && book.status === 'available' ? `
+            <button class="btn-primary" onclick="borrowBook(${book.id})">Prestar Libro</button>
+          ` : ''}
+          ${book.status === 'borrowed' ? `
+            <span class="book-status status-borrowed">Prestado</span>
+          ` : ''}
+          ${!currentUser ? `
+            <p style="color: var(--text-secondary);">Inicia sesión para prestar libros</p>
+          ` : ''}
         </div>
       </div>
     </div>
@@ -573,6 +1115,38 @@ function closeBookDetailModal() {
   modal.classList.remove('active');
 }
 
+// Borrow book
+async function borrowBook(bookId) {
+  if (!currentUser) {
+    openLoginModal();
+    return;
+  }
+
+  if (!confirm('¿Confirmar préstamo de este libro por 14 días?')) return;
+
+  try {
+    const response = await fetch(`${API_BASE}/borrowings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ book_id: bookId })
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      closeBookDetailModal();
+      loadBooks();
+      showSuccess('Libro prestado exitosamente');
+    } else {
+      showError(result.error || 'Error al prestar libro');
+    }
+  } catch (error) {
+    console.error('Error borrowing book:', error);
+    showError('Error de conexión');
+  }
+}
+
 // Delete book
 async function deleteBook(bookId) {
   if (!confirm('¿Estás seguro de que quieres eliminar este libro?')) {
@@ -581,7 +1155,8 @@ async function deleteBook(bookId) {
 
   try {
     const response = await fetch(`${API_BASE}/books/${bookId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      credentials: 'include'
     });
 
     const result = await response.json();

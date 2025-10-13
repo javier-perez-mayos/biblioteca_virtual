@@ -8,6 +8,7 @@ const API_BASE = '/api';
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+  initializeLanguage();
   checkAuthStatus();
   initializeEventListeners();
 });
@@ -73,13 +74,75 @@ function initializeEventListeners() {
   // Book form
   document.getElementById('bookForm').addEventListener('submit', handleBookSubmit);
 
+  // Language selector
+  document.getElementById('langButton')?.addEventListener('click', toggleLanguageDropdown);
+  document.querySelectorAll('.lang-option').forEach(option => {
+    option.addEventListener('click', (e) => {
+      e.preventDefault();
+      const lang = e.currentTarget.dataset.lang;
+      setLanguage(lang);
+      document.querySelector('.language-selector').classList.remove('active');
+    });
+  });
+
   // Close dropdowns on outside click
   document.addEventListener('click', (e) => {
     const userDropdown = document.querySelector('.user-dropdown');
     if (userDropdown && !userDropdown.contains(e.target)) {
       userDropdown.classList.remove('active');
     }
+
+    const langSelector = document.querySelector('.language-selector');
+    if (langSelector && !langSelector.contains(e.target)) {
+      langSelector.classList.remove('active');
+    }
   });
+}
+
+// ==================== Language ====================
+
+function initializeLanguage() {
+  // Initialize flag SVGs
+  document.getElementById('flag-en').innerHTML = getFlagSVG('en');
+  document.getElementById('flag-de').innerHTML = getFlagSVG('de');
+  document.getElementById('flag-ca').innerHTML = getFlagSVG('ca');
+  document.getElementById('currentFlag').innerHTML = getFlagSVG(getCurrentLanguage());
+
+  // Apply translations
+  updateUILanguage();
+}
+
+function toggleLanguageDropdown(e) {
+  e.stopPropagation();
+  document.querySelector('.language-selector').classList.toggle('active');
+}
+
+function updateUILanguage() {
+  // Update document language attribute
+  document.documentElement.lang = currentLanguage;
+
+  // Update page title
+  document.title = t('appTitle');
+
+  // Update current flag
+  document.getElementById('currentFlag').innerHTML = getFlagSVG(currentLanguage);
+
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach(element => {
+    const key = element.getAttribute('data-i18n');
+    element.textContent = t(key);
+  });
+
+  // Update placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+    const key = element.getAttribute('data-i18n-placeholder');
+    element.placeholder = t(key);
+  });
+
+  // Reload books and stats to update dynamic content
+  if (currentBooks.length > 0) {
+    renderBooks(currentBooks);
+  }
 }
 
 // ==================== Authentication ====================
@@ -521,7 +584,7 @@ function createBorrowedItem(borrowing) {
 }
 
 async function returnBook(bookId) {
-  if (!confirm('¿Confirmar devolución de este libro?')) return;
+  if (!confirm(t('confirmReturn'))) return;
 
   try {
     const response = await fetch(`${API_BASE}/borrowings/return`, {
@@ -534,11 +597,11 @@ async function returnBook(bookId) {
     const result = await response.json();
 
     if (result.success) {
-      showSuccess('Libro devuelto correctamente');
+      showSuccess(t('bookReturned'));
       loadBorrowedBooks();
       loadBooks();
     } else {
-      showError(result.error || 'Error al devolver libro');
+      showError(result.error || t('errorOccurred'));
     }
   } catch (error) {
     console.error('Error returning book:', error);
@@ -593,7 +656,7 @@ async function loadStats() {
     const result = await response.json();
 
     if (result.success) {
-      document.getElementById('totalBooks').textContent = result.data.totalBooks;
+      document.getElementById('totalBooksCount').textContent = result.data.totalBooks;
     }
   } catch (error) {
     console.error('Error loading stats:', error);
@@ -1122,7 +1185,7 @@ async function borrowBook(bookId) {
     return;
   }
 
-  if (!confirm('¿Confirmar préstamo de este libro por 14 días?')) return;
+  if (!confirm(t('confirmBorrow'))) return;
 
   try {
     const response = await fetch(`${API_BASE}/borrowings`, {
@@ -1137,19 +1200,19 @@ async function borrowBook(bookId) {
     if (result.success) {
       closeBookDetailModal();
       loadBooks();
-      showSuccess('Libro prestado exitosamente');
+      showSuccess(t('bookBorrowed'));
     } else {
-      showError(result.error || 'Error al prestar libro');
+      showError(result.error || t('errorOccurred'));
     }
   } catch (error) {
     console.error('Error borrowing book:', error);
-    showError('Error de conexión');
+    showError(t('errorOccurred'));
   }
 }
 
 // Delete book
 async function deleteBook(bookId) {
-  if (!confirm('¿Estás seguro de que quieres eliminar este libro?')) {
+  if (!confirm(t('confirmDelete'))) {
     return;
   }
 
@@ -1165,9 +1228,9 @@ async function deleteBook(bookId) {
       closeBookDetailModal();
       loadBooks();
       loadStats();
-      showSuccess('Libro eliminado exitosamente');
+      showSuccess(t('bookDeleted'));
     } else {
-      showError('Error eliminando libro: ' + result.error);
+      showError(result.error || t('errorOccurred'));
     }
   } catch (error) {
     console.error('Error deleting book:', error);

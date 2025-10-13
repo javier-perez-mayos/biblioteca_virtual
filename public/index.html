@@ -1,32 +1,56 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="ca">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Biblioteca Virtual</title>
   <link rel="stylesheet" href="/styles.css">
+  <script src="/flags.js"></script>
+  <script src="/translations.js"></script>
 </head>
 <body>
   <div class="app">
     <!-- Header -->
     <header class="header">
       <div class="container">
-        <h1 class="logo" onclick="window.location.reload()">📚 Biblioteca Virtual</h1>
+        <h1 class="logo" onclick="window.location.reload()"><span data-i18n="appTitle">📚 Biblioteca Virtual</span></h1>
         <div class="header-actions">
+          <!-- Language Selector -->
+          <div class="language-selector">
+            <button class="lang-button" id="langButton">
+              <span class="flag-icon" id="currentFlag"></span>
+              <span class="dropdown-arrow">▼</span>
+            </button>
+            <div class="lang-dropdown" id="langDropdown">
+              <a href="#" class="lang-option" data-lang="en">
+                <span class="flag-icon" id="flag-en"></span>
+                <span data-i18n="langEnglish">English</span>
+              </a>
+              <a href="#" class="lang-option" data-lang="de">
+                <span class="flag-icon" id="flag-de"></span>
+                <span data-i18n="langGerman">Deutsch</span>
+              </a>
+              <a href="#" class="lang-option" data-lang="ca">
+                <span class="flag-icon" id="flag-ca"></span>
+                <span data-i18n="langCatalan">Català</span>
+              </a>
+            </div>
+          </div>
+
           <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Buscar libros por título, autor o ISBN..." />
+            <input type="text" id="searchInput" data-i18n-placeholder="search" placeholder="Cercar llibres..." />
             <button id="searchBtn" class="btn-icon">🔍</button>
           </div>
 
           <!-- Auth Buttons (shown when logged out) -->
           <div id="authButtons" style="display: none;">
-            <button id="loginBtn" class="btn-secondary">Iniciar Sesión</button>
-            <button id="registerBtn" class="btn-primary">Registrarse</button>
+            <button id="loginBtn" class="btn-secondary" data-i18n="login">Iniciar Sessió</button>
+            <button id="registerBtn" class="btn-primary" data-i18n="register">Registrar-se</button>
           </div>
 
           <!-- User Menu (shown when logged in) -->
           <div id="userMenu" style="display: none;">
-            <button id="addBookBtn" class="btn-primary">+ Agregar Libro</button>
+            <button id="addBookBtn" class="btn-primary" data-i18n="addBook">+ Afegir Llibre</button>
             <div class="user-dropdown">
               <button class="user-button" id="userButton">
                 <img id="userAvatar" src="" alt="User" class="user-avatar" />
@@ -34,11 +58,11 @@
                 <span class="dropdown-arrow">▼</span>
               </button>
               <div class="dropdown-menu" id="userDropdown">
-                <a href="#" id="profileLink">Mi Perfil</a>
-                <a href="#" id="myBooksLink">Mis Libros</a>
-                <a href="#" id="borrowedBooksLink">Libros Prestados</a>
+                <a href="#" id="profileLink" data-i18n="profile">El Meu Perfil</a>
+                <a href="#" id="myBooksLink" data-i18n="myBooks">Els Meus Llibres</a>
+                <a href="#" id="borrowedBooksLink" data-i18n="borrowedBooks">Llibres Prestats</a>
                 <hr />
-                <a href="#" id="logoutLink">Cerrar Sesión</a>
+                <a href="#" id="logoutLink" data-i18n="logout">Tancar Sessió</a>
               </div>
             </div>
           </div>
@@ -50,8 +74,8 @@
     <div class="stats-bar">
       <div class="container">
         <div class="stat-item">
-          <span class="stat-label">Total de libros:</span>
-          <span class="stat-value" id="totalBooks">0</span>
+          <span class="stat-label" data-i18n="totalBooks">Total de Llibres:</span>
+          <span class="stat-value" id="totalBooksCount">0</span>
         </div>
       </div>
     </div>

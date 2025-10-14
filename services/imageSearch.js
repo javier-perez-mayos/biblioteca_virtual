@@ -34,9 +34,20 @@ class ImageSearchService {
   }
 
   /**
-   * Search using Bing Visual Search (more reliable for automation)
+   * Simplified approach: Extract text from image and search directly
+   * This avoids cookie/consent issues with visual search engines
    */
   async reverseImageSearch(imagePath) {
+    console.log('=== Image search disabled - using OCR-based search ===');
+    console.log('Visual search engines require cookies/consent which blocks automation');
+    console.log('Returning null to fallback to OCR method');
+    return null;
+  }
+
+  /**
+   * Original Bing Visual Search (disabled due to cookie issues)
+   */
+  async reverseImageSearchBing(imagePath) {
     let page = null;
     try {
       console.log('=== Starting Bing Visual Search ===');

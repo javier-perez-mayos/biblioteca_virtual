@@ -25,7 +25,7 @@ class BookRecognitionService {
 
       const result = await Tesseract.recognize(
         processedImagePath,
-        'eng+spa',
+        'eng+spa+cat+deu+fra', // English, Spanish, Catalan, German, French
         {
           logger: m => {
             if (m.status === 'recognizing text') {
@@ -175,18 +175,51 @@ class BookRecognitionService {
         }
       }
 
-      // STEP 5: If no ISBN found, try to extract title from OCR text
+      // STEP 5: If no ISBN found, try to extract title from OCR text with improved logic
       const lines = extractedText.split('\n').filter(line => line.trim().length > 0);
-      if (lines.length > 0) {
-        // Assume first non-empty lines might be the title
-        const possibleTitle = lines[0].trim();
-        const possibleAuthor = lines.length > 1 ? lines[1].trim() : '';
+      console.log('OCR extracted lines:', lines);
 
-        console.log('Attempting search with title:', possibleTitle);
-        const bookData = await this.searchByTitleAuthor(possibleTitle, possibleAuthor);
-        if (bookData) {
-          console.log('Book matched via OCR title!');
-          return { ...bookData, recognitionMethod: 'title_ocr' };
+      if (lines.length > 0) {
+        // Clean and combine lines to find title and author
+        const cleanedLines = lines.map(line => line.trim().replace(/[^\w\s]/g, ' ').trim());
+
+        // Try multiple line combinations as potential titles
+        const titleCombinations = [
+          cleanedLines[0], // First line only
+          cleanedLines.slice(0, 2).join(' '), // First two lines
+          cleanedLines.slice(0, 3).join(' ')  // First three lines
+        ];
+
+        for (const possibleTitle of titleCombinations) {
+          if (possibleTitle && possibleTitle.length >= 3) {
+            console.log('Attempting search with title:', possibleTitle);
+
+            // Try with author if available
+            const possibleAuthor = cleanedLines[1] || '';
+            let bookData = await this.searchByTitleAuthor(possibleTitle, possibleAuthor);
+
+            if (!bookData && possibleAuthor) {
+              // Try without author if first attempt failed
+              bookData = await this.searchByTitleAuthor(possibleTitle, '');
+            }
+
+            if (bookData) {
+              console.log('Book matched via OCR title!');
+              return { ...bookData, recognitionMethod: 'title_ocr' };
+            }
+          }
+        }
+
+        // Try searching with author name if it looks like a name
+        for (const line of cleanedLines) {
+          if (line.split(' ').length === 2 && line.length > 5 && line.length < 30) {
+            console.log('Attempting search by potential author:', line);
+            const bookData = await this.searchByTitleAuthor('', line);
+            if (bookData) {
+              console.log('Book matched via author name!');
+              return { ...bookData, recognitionMethod: 'author_ocr' };
+            }
+          }
         }
       }
 

@@ -6,11 +6,10 @@ A modern web application for managing an online library with automatic book reco
 
 ### Book Management
 - **📸 Advanced Book Recognition**: Multiple recognition methods for maximum accuracy
-  - **Google Reverse Image Search** (primary method): Uploads cover photo to Google Images and scrapes book details from Amazon and Goodreads
-  - Google Vision API for image-based search (fallback)
-  - OCR (Tesseract.js) for text extraction from covers (fallback)
-  - ISBN detection and lookup (fallback)
-  - Title/author extraction and matching (fallback)
+  - **Enhanced OCR** (primary method): Multi-language text extraction (English, Spanish, Catalan, German, French) with intelligent title/author detection
+  - **ISBN detection**: Automatic ISBN recognition and lookup via Google Books API
+  - **Smart title matching**: Multiple search strategies including partial matches and author-only searches
+  - Google Vision API for image-based search (optional, requires API key)
 - **✍️ Manual Entry with Auto-Complete**: Enter just the title or ISBN, and auto-complete the rest
 - **🤖 Automatic Metadata**: Automatically fetches book information from Google Books API
 - **🔍 Search & Filter**: Search books by title, author, ISBN, or categories
@@ -46,13 +45,13 @@ A modern web application for managing an online library with automatic book reco
 - Bcrypt for password hashing
 - Express-session for session management
 - Express-validator for input validation
-- **Puppeteer** for Google reverse image search and web scraping
-- Cheerio for HTML parsing
-- Tesseract.js for OCR text extraction (fallback)
-- Google Vision API for advanced image recognition (optional fallback)
+- **Tesseract.js** for multi-language OCR text extraction (primary recognition method)
 - Sharp for image processing (book covers and profile pictures)
-- Google Books API for book metadata enrichment
+- Google Books API for book metadata and ISBN lookup
+- Google Vision API for advanced image recognition (optional)
 - Multer for file uploads
+- Axios for API requests
+- Puppeteer for potential future web scraping features
 
 ### Frontend
 - Vanilla JavaScript

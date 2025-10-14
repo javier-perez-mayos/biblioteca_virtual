@@ -34,12 +34,12 @@ class ImageSearchService {
   }
 
   /**
-   * Upload image to Google Lens and perform reverse image search
+   * Search using Bing Visual Search (more reliable for automation)
    */
   async reverseImageSearch(imagePath) {
     let page = null;
     try {
-      console.log('=== Starting Google Lens reverse image search ===');
+      console.log('=== Starting Bing Visual Search ===');
       console.log('Image path:', imagePath);
 
       const browser = await this.initBrowser();
@@ -52,154 +52,123 @@ class ImageSearchService {
       page.on('console', msg => console.log('PAGE LOG:', msg.text()));
       page.on('pageerror', error => console.log('PAGE ERROR:', error.message));
 
-      // Set user agent to avoid detection
+      // Set user agent
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       console.log('User agent set');
 
-      // Use Google Lens upload endpoint directly
-      console.log('Navigating to Google Lens upload page...');
-      await page.goto('https://lens.google.com/upload', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Use Bing Visual Search
+      console.log('Navigating to Bing Visual Search...');
+      await page.goto('https://www.bing.com/visualsearch', { waitUntil: 'networkidle2', timeout: 30000 });
       console.log('Page loaded, current URL:', page.url());
 
-      // Wait for file input to appear
-      console.log('Waiting for file input...');
-      await page.waitForSelector('input[type="file"]', { timeout: 10000 });
-      console.log('File input found');
+      // Wait for upload button/input
+      console.log('Waiting for upload element...');
+      await page.waitForSelector('input[type="file"], #sb_fileinput', { timeout: 10000 });
+      console.log('Upload input found');
 
-      // Upload the image file
+      // Find and upload the file
       const fileInput = await page.$('input[type="file"]');
-      console.log('Uploading file...');
-      await fileInput.uploadFile(imagePath);
-      console.log('File uploaded, waiting for processing...');
+      if (fileInput) {
+        console.log('Uploading file to Bing...');
+        await fileInput.uploadFile(imagePath);
+        console.log('File uploaded, waiting for results...');
 
-      // Wait for results to load - use setTimeout instead of waitForTimeout
-      await new Promise(resolve => setTimeout(resolve, 8000));
-      console.log('Wait complete, current URL:', page.url());
+        // Wait for results
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
-      // Take a screenshot for debugging
-      const screenshotPath = 'debug-lens-' + Date.now() + '.png';
-      await page.screenshot({ path: screenshotPath, fullPage: true });
-      console.log('Screenshot saved to:', screenshotPath);
-
-      // Try to wait for navigation or results
-      try {
-        console.log('Checking if page has results...');
-        await page.waitForSelector('a[href*="amazon"], a[href*="goodreads"], a[href*="books"], div[role="link"]', { timeout: 5000 });
-        console.log('Found result elements');
-      } catch (e) {
-        console.log('No specific result selectors found after upload, proceeding with page scraping...');
-      }
-
-      // Get page content
-      const htmlContent = await page.content();
-      console.log('Page HTML length:', htmlContent.length);
-
-      // Extract search results from Google Lens
-      console.log('Extracting results from page...');
-      const results = await page.evaluate(() => {
-        const data = {
-          bestGuess: '',
-          titles: [],
-          links: [],
-          amazonLinks: [],
-          goodreadsLinks: [],
-          allText: []
-        };
-
-        // Try to find the main title/best guess in various places
-        const titleSelectors = [
-          'h1', 'h2', 'h3', '[class*="title"]', '[class*="heading"]',
-          '[data-text-content]', '[class*="product"]', '[role="heading"]'
-        ];
-
-        console.log('Searching for titles...');
-        for (const selector of titleSelectors) {
-          const elements = document.querySelectorAll(selector);
-          if (elements.length > 0) {
-            console.log(`Found ${elements.length} elements for selector: ${selector}`);
-          }
-          elements.forEach(el => {
-            const text = el.textContent.trim();
-            if (text && text.length > 5 && text.length < 200 && !data.titles.includes(text)) {
-              data.titles.push(text);
-              console.log('Found title:', text);
-            }
-          });
+        // Wait for result page to load
+        try {
+          await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
+          console.log('Navigation complete');
+        } catch (e) {
+          console.log('No navigation detected, checking current page...');
         }
 
-        // Get all text content
-        const allElements = document.querySelectorAll('div, span, p, a');
-        allElements.forEach(el => {
-          const text = el.textContent.trim();
-          if (text && text.length > 10 && text.length < 150) {
-            data.allText.push(text);
+        console.log('Current URL after upload:', page.url());
+
+        // Take screenshot for debugging
+        const screenshotPath = 'debug-bing-' + Date.now() + '.png';
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log('Screenshot saved to:', screenshotPath);
+
+        // Wait for results to appear
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Extract results
+        console.log('Extracting results from Bing...');
+        const results = await page.evaluate(() => {
+          const data = {
+            bestGuess: '',
+            titles: [],
+            links: [],
+            amazonLinks: [],
+            goodreadsLinks: [],
+            allText: []
+          };
+
+          // Look for result titles
+          const titleSelectors = [
+            '.b_title', '.productTitle', 'h2 a', 'h3 a', '.b_entityTitle'
+          ];
+
+          for (const selector of titleSelectors) {
+            const elements = document.querySelectorAll(selector);
+            console.log(`Selector ${selector}: found ${elements.length} elements`);
+            elements.forEach(el => {
+              const text = el.textContent.trim();
+              if (text && text.length > 5 && text.length < 200 && !data.titles.includes(text)) {
+                data.titles.push(text);
+                console.log('Found title:', text);
+              }
+            });
           }
-        });
 
-        // Set best guess from first title
-        if (data.titles.length > 0) {
-          data.bestGuess = data.titles[0];
-        }
-
-        // Get all links
-        console.log('Searching for links...');
-        const linkElements = document.querySelectorAll('a[href]');
-        console.log(`Found ${linkElements.length} total links`);
-
-        linkElements.forEach(link => {
-          const href = link.href;
-          const text = link.textContent.trim();
-
-          if (href.includes('amazon.') && !data.amazonLinks.includes(href)) {
-            console.log('Found Amazon link:', href);
-            data.amazonLinks.push(href);
-          } else if (href.includes('goodreads.com') && !data.goodreadsLinks.includes(href)) {
-            console.log('Found Goodreads link:', href);
-            data.goodreadsLinks.push(href);
+          // Get best guess from first title
+          if (data.titles.length > 0) {
+            data.bestGuess = data.titles[0];
           }
 
-          if (href && !href.includes('google.com') && !href.includes('lens.google') && !href.startsWith('javascript:')) {
-            if (!data.links.includes(href)) {
+          // Extract all links
+          const linkElements = document.querySelectorAll('a[href]');
+          console.log(`Found ${linkElements.length} total links`);
+
+          linkElements.forEach(link => {
+            const href = link.href;
+
+            if (href.includes('amazon.') && !data.amazonLinks.includes(href)) {
+              console.log('Found Amazon link:', href);
+              data.amazonLinks.push(href);
+            } else if (href.includes('goodreads.com') && !data.goodreadsLinks.includes(href)) {
+              console.log('Found Goodreads link:', href);
+              data.goodreadsLinks.push(href);
+            } else if (href.includes('books.google') && !data.links.includes(href)) {
               data.links.push(href);
             }
-          }
+          });
+
+          return data;
         });
 
-        return data;
-      });
+        console.log('=== Bing Visual Search Results ===');
+        console.log('Best guess:', results.bestGuess);
+        console.log('Titles found:', results.titles.length, results.titles.slice(0, 5));
+        console.log('Amazon links:', results.amazonLinks.length, results.amazonLinks);
+        console.log('Goodreads links:', results.goodreadsLinks.length, results.goodreadsLinks);
 
-      console.log('=== Reverse image search results ===');
-      console.log('Best guess:', results.bestGuess);
-      console.log('Titles found:', results.titles.length, results.titles.slice(0, 5));
-      console.log('Amazon links:', results.amazonLinks.length, results.amazonLinks);
-      console.log('Goodreads links:', results.goodreadsLinks.length, results.goodreadsLinks);
-      console.log('Total external links:', results.links.length);
-      console.log('Sample text:', results.allText.slice(0, 10));
-
-      // If no results from Lens, try extracting book title from text
-      if (!results.bestGuess && results.allText.length > 0) {
-        console.log('No best guess found, trying to extract from text...');
-        // Look for book-like titles (capitalized words)
-        for (const text of results.allText) {
-          if (/^[A-Z][a-z]+(\s+[A-Z][a-z]+)+/.test(text) && text.length > 10) {
-            results.bestGuess = text;
-            console.log('Extracted title from text:', text);
-            break;
-          }
-        }
+        return results;
+      } else {
+        console.log('Could not find file input on Bing');
+        return null;
       }
-
-      return results;
     } catch (error) {
       console.error('!!! Error in reverse image search !!!');
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
 
-      // Try to get page state on error
       if (page) {
         try {
           console.log('Page URL on error:', await page.url());
-          await page.screenshot({ path: 'error-lens-' + Date.now() + '.png' });
+          await page.screenshot({ path: 'error-bing-' + Date.now() + '.png' });
           console.log('Error screenshot saved');
         } catch (e) {
           console.log('Could not capture error state');

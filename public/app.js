@@ -1327,43 +1327,106 @@ async function startBarcodeScanner() {
   cameraPreview.style.display = 'none';
   scannerDiv.style.display = 'block';
 
+  // Check if Quagga is available
+  if (typeof Quagga === 'undefined') {
+    console.error('Quagga library not loaded');
+    alert(t('errorOccurred') + ': Quagga library not loaded. Please refresh the page.');
+    stopBarcodeScanner();
+    return;
+  }
+
   try {
-    // Initialize Quagga
-    await Quagga.init({
+    console.log('Initializing Quagga...');
+
+    // Initialize Quagga with high quality settings
+    Quagga.init({
       inputStream: {
         type: 'LiveStream',
-        target: document.querySelector('#barcodeVideo'),
+        target: document.querySelector('#barcodeScannerViewport'),
         constraints: {
-          width: { min: 640 },
-          height: { min: 480 },
+          width: { min: 1280, ideal: 1920 },
+          height: { min: 720, ideal: 1080 },
           facingMode: 'environment', // Use back camera
-          aspectRatio: { min: 1, max: 2 }
-        }
+          aspectRatio: { ideal: 16/9 }
+        },
+        area: { // Only scan center area
+          top: "20%",
+          right: "20%",
+          left: "20%",
+          bottom: "20%"
+        },
+        size: 1280, // High resolution processing
+        singleChannel: false // Use full color
       },
+      frequency: 5, // Scan every 5 frames (more frequent)
       locator: {
-        patchSize: 'medium',
-        halfSample: true
+        patchSize: 'large', // Larger patch for better accuracy
+        halfSample: false // Don't downsample
       },
-      numOfWorkers: 2,
+      numOfWorkers: 4, // More workers for faster processing
       decoder: {
-        readers: ['ean_reader', 'ean_8_reader'], // ISBN uses EAN-13
+        readers: [
+          'ean_reader',      // EAN-13 (ISBN-13) - primary
+          'ean_8_reader'     // EAN-8
+        ],
         debug: {
           drawBoundingBox: true,
           showFrequency: true,
           drawScanline: true,
           showPattern: true
-        }
+        },
+        multiple: false // Only detect one barcode at a time
       },
       locate: true
     }, function(err) {
       if (err) {
         console.error('Quagga initialization error:', err);
-        alert(t('errorOccurred') + ': ' + err.message);
+
+        // Check if it's a camera permission error
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          alert('Camera access denied. Please grant camera permissions and try again.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          alert('No camera found. Please ensure your device has a camera.');
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          alert('Camera is already in use by another application.');
+        } else {
+          alert(t('errorOccurred') + ': ' + (err.message || 'Camera initialization failed'));
+        }
+
         stopBarcodeScanner();
         return;
       }
+
       console.log('Quagga initialized successfully');
       Quagga.start();
+      console.log('Quagga started, camera should be active');
+    });
+
+    // Listen for processing events (for debugging)
+    Quagga.onProcessed(function(result) {
+      var drawingCtx = Quagga.canvas.ctx.overlay;
+      var drawingCanvas = Quagga.canvas.dom.overlay;
+
+      if (result) {
+        // Draw processing feedback
+        if (result.boxes) {
+          drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute("width")), parseInt(drawingCanvas.getAttribute("height")));
+          result.boxes.filter(function (box) {
+            return box !== result.box;
+          }).forEach(function (box) {
+            Quagga.ImageDebug.drawPath(box, {x: 0, y: 1}, drawingCtx, {color: "green", lineWidth: 2});
+          });
+        }
+
+        if (result.box) {
+          Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, drawingCtx, {color: "#00F", lineWidth: 2});
+        }
+
+        if (result.codeResult && result.codeResult.code) {
+          Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, drawingCtx, {color: 'red', lineWidth: 3});
+          console.log('Code detected (processing):', result.codeResult.code);
+        }
+      }
     });
 
     // Listen for barcode detection
@@ -1379,21 +1442,38 @@ async function startBarcodeScanner() {
 
 function onBarcodeDetected(result) {
   const code = result.codeResult.code;
-  console.log('Barcode detected:', code);
+  console.log('Barcode detected:', code, 'Format:', result.codeResult.format);
+
+  // Clean the code (remove any non-digit characters except X for ISBN-10)
+  const cleanCode = code.replace(/[^0-9X]/gi, '');
 
   // Validate ISBN (13 or 10 digits)
-  if (code && (code.length === 13 || code.length === 10)) {
-    console.log('Valid ISBN detected:', code);
+  if (cleanCode && (cleanCode.length === 13 || cleanCode.length === 10 || cleanCode.length === 8)) {
+    console.log('Valid barcode detected:', cleanCode);
+
+    // Play a beep sound to indicate detection (optional)
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      oscillator.connect(audioContext.destination);
+      oscillator.frequency.value = 800;
+      oscillator.start();
+      setTimeout(() => oscillator.stop(), 100);
+    } catch (e) {
+      // Audio not supported, ignore
+    }
 
     // Display detected ISBN
-    document.getElementById('detectedIsbn').textContent = code;
+    document.getElementById('detectedIsbn').textContent = cleanCode;
     document.getElementById('barcodeResult').style.display = 'block';
 
     // Stop scanner after detection
     stopBarcodeScanner();
 
     // Search for book by ISBN
-    searchBookByISBN(code);
+    searchBookByISBN(cleanCode);
+  } else {
+    console.log('Invalid barcode length:', cleanCode.length, 'Code:', cleanCode);
   }
 }
 

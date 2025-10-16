@@ -4,3 +4,9 @@ database.db
 uploads/
 *.log
 .DS_Store
+
+# SSL certificates (never commit private keys!)
+ssl/
+*.key
+*.cert
+*.pem

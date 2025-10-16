@@ -36,7 +36,13 @@ A modern web application for managing an online library with automatic book reco
 ### Technical Features
 - **💾 Local Storage**: All data stored in SQLite database
 - **📱 Responsive Design**: Works on desktop and mobile devices
-- **🔒 Security**: Password hashing, session management, role-based access control
+- **🔒 Security**:
+  - Password hashing with bcrypt
+  - Session management with express-session
+  - Role-based access control
+  - **HTTPS/SSL support** with automatic HTTP redirect
+  - Self-signed certificates for development
+  - Production-ready SSL configuration
 
 ## Technology Stack
 
@@ -98,7 +104,30 @@ This creates an admin user with:
 - Email: `biblioteca@casalmunic.de`
 - Password: From `ADMIN_PASSWORD` environment variable
 
-6. **(Optional but Recommended) Configure API keys**:
+6. **(Optional) Configure SSL/HTTPS**:
+
+To enable HTTPS, you need SSL certificates. For development, you can use self-signed certificates:
+
+```bash
+# Create ssl directory
+mkdir ssl
+
+# Generate self-signed certificate
+openssl req -nodes -new -x509 -days 365 -keyout ssl/server.key -out ssl/server.cert -subj "/C=DE/ST=Bavaria/L=Munich/O=Biblioteca Virtual/OU=IT/CN=localhost"
+```
+
+Then enable HTTPS in `.env`:
+```bash
+USE_SSL=true
+HTTPS_PORT=3443
+HTTP_REDIRECT=true  # Redirects HTTP to HTTPS
+SSL_KEY_PATH=./ssl/server.key
+SSL_CERT_PATH=./ssl/server.cert
+```
+
+**For production**, use certificates from a trusted Certificate Authority like [Let's Encrypt](https://letsencrypt.org/).
+
+7. **(Optional but Recommended) Configure API keys**:
 
    **Google Books API** (recommended for better metadata):
    - Visit: https://developers.google.com/books/docs/v1/using#APIKey
@@ -127,13 +156,21 @@ This creates an admin user with:
    SESSION_SECRET=your_secure_random_secret_here
    ```
 
-7. **Start the server**:
+8. **Start the server**:
 ```bash
 npm start
 ```
 
-8. **Open your browser**:
-   Navigate to http://localhost:3000
+The server will start on:
+- **HTTP mode** (default): http://localhost:3000
+- **HTTPS mode** (if SSL enabled): https://localhost:3443
+  - HTTP redirect: http://localhost:3000 → https://localhost:3443
+
+9. **Open your browser**:
+   - Without SSL: Navigate to http://localhost:3000
+   - With SSL: Navigate to https://localhost:3443
+
+   **Note**: If using self-signed certificates, your browser will show a security warning. This is normal for development. Click "Advanced" → "Proceed to localhost" to continue.
 
 ## Usage
 

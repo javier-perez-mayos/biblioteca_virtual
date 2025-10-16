@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const https = require('https');
+const http = require('http');
 const cors = require('cors');
 const session = require('express-session');
 const multer = require('multer');
@@ -1048,12 +1050,59 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`\n🚀 Biblioteca Virtual server running on http://localhost:${PORT}`);
-  console.log(`📚 API available at http://localhost:${PORT}/api`);
-  console.log(`🌐 Web interface at http://localhost:${PORT}\n`);
-});
+// Start server with HTTPS support
+const USE_SSL = process.env.USE_SSL === 'true';
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH || './ssl/server.key';
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH || './ssl/server.cert';
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
+
+if (USE_SSL) {
+  // Check if SSL certificates exist
+  if (!fs.existsSync(SSL_KEY_PATH) || !fs.existsSync(SSL_CERT_PATH)) {
+    console.error('❌ SSL certificates not found!');
+    console.error(`   Key: ${SSL_KEY_PATH}`);
+    console.error(`   Cert: ${SSL_CERT_PATH}`);
+    console.error('\nTo generate self-signed certificates, run:');
+    console.error('openssl req -nodes -new -x509 -days 365 -keyout ssl/server.key -out ssl/server.cert\n');
+    process.exit(1);
+  }
+
+  // Load SSL certificates
+  const sslOptions = {
+    key: fs.readFileSync(SSL_KEY_PATH),
+    cert: fs.readFileSync(SSL_CERT_PATH)
+  };
+
+  // Create HTTPS server
+  const httpsServer = https.createServer(sslOptions, app);
+
+  httpsServer.listen(HTTPS_PORT, () => {
+    console.log(`\n🔒 Biblioteca Virtual HTTPS server running on https://localhost:${HTTPS_PORT}`);
+    console.log(`📚 API available at https://localhost:${HTTPS_PORT}/api`);
+    console.log(`🌐 Web interface at https://localhost:${HTTPS_PORT}\n`);
+  });
+
+  // Optionally also start HTTP server that redirects to HTTPS
+  if (process.env.HTTP_REDIRECT === 'true') {
+    const httpApp = express();
+    httpApp.use((req, res) => {
+      res.redirect(301, `https://${req.headers.host.split(':')[0]}:${HTTPS_PORT}${req.url}`);
+    });
+
+    httpApp.listen(PORT, () => {
+      console.log(`🔀 HTTP redirect server running on http://localhost:${PORT} → https://localhost:${HTTPS_PORT}\n`);
+    });
+  }
+} else {
+  // Start HTTP server (default)
+  const httpServer = http.createServer(app);
+
+  httpServer.listen(PORT, () => {
+    console.log(`\n🚀 Biblioteca Virtual server running on http://localhost:${PORT}`);
+    console.log(`📚 API available at http://localhost:${PORT}/api`);
+    console.log(`🌐 Web interface at http://localhost:${PORT}\n`);
+  });
+}
 
 // Graceful shutdown
 process.on('SIGINT', () => {

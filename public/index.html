@@ -139,6 +139,7 @@
               <input type="file" id="coverInput" accept="image/*" style="display: none;" />
               <button id="takePictureBtn" class="btn-secondary" data-i18n="takePictureCover">📷 Fer Foto de la Portada</button>
               <button id="uploadFileBtn" class="btn-secondary" data-i18n="uploadFileCover">📁 Pujar Imatge de Portada</button>
+              <button id="scanBarcodeBtn" class="btn-secondary" data-i18n="scanBarcode">🔍 Escanejar Codi de Barres</button>
               <button id="manualEntryBtn" class="btn-secondary" data-i18n="manualEntry">✍️ Entrada Manual</button>
             </div>
             <div id="cameraPreview" style="display: none;">
@@ -147,6 +148,18 @@
               <div class="camera-controls">
                 <button id="captureBtn" class="btn-primary" data-i18n="capture">📸 Capturar</button>
                 <button id="cancelCameraBtn" class="btn-secondary" data-i18n="cancel">Cancel·lar</button>
+              </div>
+            </div>
+            <div id="barcodeScanner" style="display: none;">
+              <div id="barcodeScannerViewport" style="position: relative; width: 100%; max-width: 640px; margin: 0 auto;">
+                <video id="barcodeVideo" autoplay playsinline style="width: 100%; height: auto;"></video>
+                <canvas id="barcodeCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+              </div>
+              <div id="barcodeResult" style="margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 8px; display: none;">
+                <p style="margin: 0;"><strong data-i18n="isbnDetected">ISBN detectat:</strong> <span id="detectedIsbn"></span></p>
+              </div>
+              <div class="camera-controls">
+                <button id="cancelBarcodeBtn" class="btn-secondary" data-i18n="cancel">Cancel·lar</button>
               </div>
             </div>
             <div id="uploadProgress" style="display: none;">
@@ -528,6 +541,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
   <script src="/admin.js"></script>
   <script src="/app.js"></script>
 </body>

@@ -384,6 +384,30 @@ app.get('/api/books/:id', requireAuth, async (req, res) => {
 });
 
 /**
+ * GET /api/books/search-isbn/:isbn - Search book by ISBN
+ */
+app.get('/api/books/search-isbn/:isbn', requireAuth, async (req, res) => {
+  try {
+    const isbn = req.params.isbn;
+    console.log('Searching for book with ISBN:', isbn);
+
+    // Use book recognition service to search by ISBN
+    const bookData = await bookRecognition.searchByISBN(isbn);
+
+    if (bookData) {
+      console.log('Book found for ISBN:', isbn);
+      res.json({ success: true, data: bookData });
+    } else {
+      console.log('No book found for ISBN:', isbn);
+      res.status(404).json({ success: false, error: 'Book not found' });
+    }
+  } catch (error) {
+    console.error('Error searching by ISBN:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/books/upload - Upload book cover and recognize
  */
 app.post('/api/books/upload', requireAuth, upload.single('cover'), async (req, res) => {

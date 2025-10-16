@@ -6,7 +6,8 @@ A modern web application for managing an online library with automatic book reco
 
 ### Book Management
 - **📸 Advanced Book Recognition**: Multiple recognition methods for maximum accuracy
-  - **Enhanced OCR** (primary method): Multi-language text extraction (English, Spanish, Catalan, German, French) with intelligent title/author detection
+  - **📱 Barcode Scanner** (fastest method): Real-time ISBN barcode scanning using device camera (supports EAN-13/EAN-8 format)
+  - **Enhanced OCR** (fallback): Multi-language text extraction (English, Spanish, Catalan, German, French) with intelligent title/author detection
   - **ISBN detection**: Automatic ISBN recognition and lookup via Google Books API
   - **Smart title matching**: Multiple search strategies including partial matches and author-only searches
   - Google Vision API for image-based search (optional, requires API key)
@@ -55,6 +56,7 @@ A modern web application for managing an online library with automatic book reco
 
 ### Frontend
 - Vanilla JavaScript
+- **Quagga2** for real-time barcode scanning
 - Modern CSS with Grid and Flexbox
 - Native Web APIs (Camera, File Upload)
 

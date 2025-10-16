@@ -69,10 +69,12 @@ function initializeEventListeners() {
   document.getElementById('uploadFileBtn').addEventListener('click', () => {
     document.getElementById('coverInput').click();
   });
+  document.getElementById('scanBarcodeBtn').addEventListener('click', startBarcodeScanner);
   document.getElementById('manualEntryBtn').addEventListener('click', showManualEntryForm);
   document.getElementById('coverInput').addEventListener('change', handleFileUpload);
   document.getElementById('captureBtn').addEventListener('click', capturePhoto);
   document.getElementById('cancelCameraBtn').addEventListener('click', stopCamera);
+  document.getElementById('cancelBarcodeBtn').addEventListener('click', stopBarcodeScanner);
   document.getElementById('autoCompleteBtn').addEventListener('click', autoCompleteBookData);
 
   // Book form
@@ -1308,3 +1310,155 @@ window.onclick = function(event) {
     closeBookDetailModal();
   }
 };
+
+// === Barcode Scanner Functions ===
+let barcodeStream = null;
+let quaggaInitialized = false;
+
+async function startBarcodeScanner() {
+  console.log('Starting barcode scanner...');
+
+  const scannerDiv = document.getElementById('barcodeScanner');
+  const uploadArea = document.querySelector('.upload-area');
+  const cameraPreview = document.getElementById('cameraPreview');
+
+  // Hide other options
+  uploadArea.style.display = 'none';
+  cameraPreview.style.display = 'none';
+  scannerDiv.style.display = 'block';
+
+  try {
+    // Initialize Quagga
+    await Quagga.init({
+      inputStream: {
+        type: 'LiveStream',
+        target: document.querySelector('#barcodeVideo'),
+        constraints: {
+          width: { min: 640 },
+          height: { min: 480 },
+          facingMode: 'environment', // Use back camera
+          aspectRatio: { min: 1, max: 2 }
+        }
+      },
+      locator: {
+        patchSize: 'medium',
+        halfSample: true
+      },
+      numOfWorkers: 2,
+      decoder: {
+        readers: ['ean_reader', 'ean_8_reader'], // ISBN uses EAN-13
+        debug: {
+          drawBoundingBox: true,
+          showFrequency: true,
+          drawScanline: true,
+          showPattern: true
+        }
+      },
+      locate: true
+    }, function(err) {
+      if (err) {
+        console.error('Quagga initialization error:', err);
+        alert(t('errorOccurred') + ': ' + err.message);
+        stopBarcodeScanner();
+        return;
+      }
+      console.log('Quagga initialized successfully');
+      Quagga.start();
+    });
+
+    // Listen for barcode detection
+    Quagga.onDetected(onBarcodeDetected);
+    quaggaInitialized = true;
+
+  } catch (error) {
+    console.error('Error starting barcode scanner:', error);
+    alert(t('errorOccurred') + ': ' + error.message);
+    stopBarcodeScanner();
+  }
+}
+
+function onBarcodeDetected(result) {
+  const code = result.codeResult.code;
+  console.log('Barcode detected:', code);
+
+  // Validate ISBN (13 or 10 digits)
+  if (code && (code.length === 13 || code.length === 10)) {
+    console.log('Valid ISBN detected:', code);
+
+    // Display detected ISBN
+    document.getElementById('detectedIsbn').textContent = code;
+    document.getElementById('barcodeResult').style.display = 'block';
+
+    // Stop scanner after detection
+    stopBarcodeScanner();
+
+    // Search for book by ISBN
+    searchBookByISBN(code);
+  }
+}
+
+async function searchBookByISBN(isbn) {
+  console.log('Searching for book with ISBN:', isbn);
+
+  try {
+    // Show loading
+    const progressDiv = document.getElementById('uploadProgress');
+    progressDiv.style.display = 'block';
+    document.querySelector('.progress-text').textContent = t('loading');
+
+    // Call backend to search by ISBN
+    const response = await fetch(`${API_BASE}/books/search-isbn/${isbn}`, {
+      method: 'GET',
+      credentials: 'include'
+    });
+
+    const result = await response.json();
+    progressDiv.style.display = 'none';
+
+    if (result.success && result.data) {
+      console.log('Book found:', result.data);
+
+      // Fill form with book data
+      currentCoverFile = null; // No cover file since we're using ISBN
+      populateBookForm(result.data);
+
+      // Show details step
+      document.getElementById('uploadStep').style.display = 'none';
+      document.getElementById('detailsStep').style.display = 'block';
+
+      // Show success message
+      const statusDiv = document.getElementById('recognitionStatus');
+      statusDiv.textContent = t('bookAdded');
+      statusDiv.className = 'status-message status-success';
+      statusDiv.style.display = 'block';
+    } else {
+      alert(t('bookNotFound'));
+      // Reset scanner
+      document.querySelector('.upload-area').style.display = 'block';
+      document.getElementById('barcodeScanner').style.display = 'none';
+      document.getElementById('barcodeResult').style.display = 'none';
+    }
+  } catch (error) {
+    console.error('Error searching by ISBN:', error);
+    alert(t('errorOccurred'));
+    document.getElementById('uploadProgress').style.display = 'none';
+  }
+}
+
+function stopBarcodeScanner() {
+  console.log('Stopping barcode scanner...');
+
+  if (quaggaInitialized) {
+    Quagga.stop();
+    Quagga.offDetected(onBarcodeDetected);
+    quaggaInitialized = false;
+  }
+
+  // Hide scanner
+  const scannerDiv = document.getElementById('barcodeScanner');
+  scannerDiv.style.display = 'none';
+  document.getElementById('barcodeResult').style.display = 'none';
+
+  // Show upload options
+  document.querySelector('.upload-area').style.display = 'block';
+}

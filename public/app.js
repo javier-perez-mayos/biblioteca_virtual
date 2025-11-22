@@ -1312,11 +1312,11 @@ window.onclick = function(event) {
 };
 
 // === Barcode Scanner Functions ===
-let codeReader = null;
-let scannerStream = null;
+let html5QrCodeScanner = null;
+let isScannerActive = false;
 
 async function startBarcodeScanner() {
-  console.log('Starting barcode scanner with ZXing...');
+  console.log('Starting barcode scanner with html5-qrcode...');
 
   const scannerDiv = document.getElementById('barcodeScanner');
   const uploadArea = document.querySelector('.upload-area');
@@ -1327,154 +1327,228 @@ async function startBarcodeScanner() {
   cameraPreview.style.display = 'none';
   scannerDiv.style.display = 'block';
 
-  // Check if ZXing is available
-  if (typeof ZXing === 'undefined') {
-    console.error('ZXing library not loaded');
-    alert(t('errorOccurred') + ': ZXing library not loaded. Please refresh the page.');
+  // Check if html5-qrcode is available
+  if (typeof Html5Qrcode === 'undefined') {
+    console.error('html5-qrcode library not loaded');
+    alert(t('errorOccurred') + ': Barcode scanner library not loaded. Please refresh the page.');
     stopBarcodeScanner();
     return;
   }
 
   try {
-    console.log('Initializing ZXing barcode reader...');
+    console.log('Initializing html5-qrcode scanner...');
 
-    const video = document.getElementById('barcodeScannerVideo');
-    const canvas = document.getElementById('barcodeScannerCanvas');
-    const canvasCtx = canvas.getContext('2d');
+    // Verify the scanner div exists
+    const scannerElement = document.getElementById('barcodeScannerReader');
+    if (!scannerElement) {
+      throw new Error('Scanner div element not found');
+    }
+    console.log('Scanner div found');
 
-    // Create multi-format reader that can handle EAN-13, EAN-8, and other formats
-    codeReader = new ZXing.BrowserMultiFormatReader();
-
-    console.log('Getting video input devices...');
-    const videoInputDevices = await codeReader.listVideoInputDevices();
-
-    if (videoInputDevices.length === 0) {
-      alert('No camera found. Please ensure your device has a camera.');
-      stopBarcodeScanner();
-      return;
+    // Initialize scanner only if not already created
+    if (!html5QrCodeScanner) {
+      html5QrCodeScanner = new Html5Qrcode("barcodeScannerReader");
+      console.log('Html5Qrcode instance created');
     }
 
-    console.log(`Found ${videoInputDevices.length} camera(s)`);
+    // Populate camera selector
+    const cameraSelect = document.getElementById('cameraSelect');
+    cameraSelect.innerHTML = ''; // Clear existing options
 
-    // Prefer back camera (environment facing) if available
-    let selectedDeviceId = videoInputDevices[0].deviceId;
-    for (const device of videoInputDevices) {
-      if (device.label.toLowerCase().includes('back') ||
-          device.label.toLowerCase().includes('environment') ||
-          device.label.toLowerCase().includes('rear')) {
-        selectedDeviceId = device.deviceId;
-        console.log('Using back camera:', device.label);
-        break;
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length) {
+        console.log(`Found ${devices.length} camera(s)`);
+
+        // If no cameras found, add fallback option
+        if (devices.length === 0) {
+          cameraSelect.innerHTML = '<option value="environment" selected>Default (Back Camera)</option>';
+        } else {
+          // Add each camera as an option
+          devices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = device.id;
+            option.text = device.label || `Camera ${device.id.substr(0, 8)}...`;
+
+            // Add camera emojis
+            const label = device.label ? device.label.toLowerCase() : '';
+            if (label.includes('back') || label.includes('environment') || label.includes('rear')) {
+              option.text += ' 📱';
+            } else if (label.includes('front') || label.includes('user') || label.includes('face')) {
+              option.text += ' 🤳';
+            }
+
+            cameraSelect.appendChild(option);
+          });
+
+          console.log('Camera dropdown populated with device IDs');
+        }
+      } else {
+        // Fallback if no devices
+        cameraSelect.innerHTML = '<option value="environment" selected>Default (Back Camera)</option>';
       }
+    } catch (err) {
+      console.warn('Could not list cameras:', err);
+      // Fallback on error
+      cameraSelect.innerHTML = '<option value="environment" selected>Default (Back Camera)</option>';
     }
 
-    // Get video stream with high resolution
-    const constraints = {
-      video: {
-        deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
-        width: { min: 1280, ideal: 1920 },
-        height: { min: 720, ideal: 1080 },
-        facingMode: 'environment'
+    // Add event listener for camera change
+    cameraSelect.onchange = async () => {
+      console.log('Camera selection changed to:', cameraSelect.value);
+      if (isScannerActive) {
+        console.log('Stopping current scanner...');
+        await stopScanning();
+        console.log('Starting scanner with new camera...');
+        await startScanning();
       }
-    };
-
-    console.log('Starting video stream...');
-    scannerStream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = scannerStream;
-    await video.play();
-
-    console.log('Video stream started, beginning scan loop...');
-
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    // Continuous scanning loop
-    const scanLoop = async () => {
-      if (!scannerStream) {
-        return; // Scanner was stopped
-      }
-
-      try {
-        // Draw video frame to canvas
-        canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Try to decode barcode from canvas
-        const result = await codeReader.decodeFromCanvas(canvas);
-
-        if (result) {
-          console.log('Barcode detected:', result.getText(), 'Format:', result.getBarcodeFormat());
-          onBarcodeDetected(result);
-          return; // Stop scanning after successful detection
-        }
-      } catch (error) {
-        // No barcode found in this frame, continue scanning
-        if (error.name !== 'NotFoundException') {
-          console.warn('Decode error:', error);
-        }
-      }
-
-      // Continue scanning
-      requestAnimationFrame(scanLoop);
     };
 
     // Start scanning
-    scanLoop();
+    await startScanning();
 
   } catch (error) {
     console.error('Error starting barcode scanner:', error);
-
-    // Check for specific error types
-    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-      alert('Camera access denied. Please grant camera permissions and try again.');
-    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-      alert('No camera found. Please ensure your device has a camera.');
-    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-      alert('Camera is already in use by another application.');
-    } else {
-      alert(t('errorOccurred') + ': ' + (error.message || 'Camera initialization failed'));
-    }
-
+    alert(t('errorOccurred') + ': ' + (error.message || 'Camera initialization failed'));
     stopBarcodeScanner();
   }
 }
 
-function onBarcodeDetected(result) {
-  const code = result.getText();
-  const format = result.getBarcodeFormat();
-  console.log('Barcode detected:', code, 'Format:', format);
 
-  // Clean the code (remove any non-digit characters except X for ISBN-10)
-  const cleanCode = code.replace(/[^0-9X]/gi, '');
+async function startScanning() {
+  // Don't start if already active
+  if (isScannerActive) {
+    console.log('Scanner already active, stopping first...');
+    await stopScanning();
+  }
 
-  // Validate ISBN (13 or 10 digits, or 8 for EAN-8)
-  if (cleanCode && (cleanCode.length === 13 || cleanCode.length === 10 || cleanCode.length === 8)) {
-    console.log('Valid barcode detected:', cleanCode);
+  const cameraSelect = document.getElementById('cameraSelect');
+  const selectedValue = cameraSelect.value;
 
-    // Play a beep sound to indicate detection (optional)
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      oscillator.connect(audioContext.destination);
-      oscillator.frequency.value = 800;
-      oscillator.start();
-      setTimeout(() => oscillator.stop(), 100);
-    } catch (e) {
-      // Audio not supported, ignore
+  console.log('Starting scan with camera:', selectedValue);
+
+  // html5-qrcode expects either:
+  // - A camera ID string
+  // - OR a simple constraint object with ONE key: facingMode OR deviceId
+  let cameraIdOrConfig;
+
+  if (selectedValue === 'environment') {
+    cameraIdOrConfig = { facingMode: "environment" };
+  } else {
+    cameraIdOrConfig = selectedValue; // Just the device ID string
+  }
+
+  // Scanner configuration with video constraints
+  const config = {
+    fps: 10,
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+      const minEdgePercentage = 0.70;
+      const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+      const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+      return {
+        width: qrboxSize,
+        height: Math.floor(qrboxSize * 0.6) // Rectangular for ISBN barcodes
+      };
+    },
+    formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13 ],
+    videoConstraints: {
+      width: { min: 640, ideal: 1280, max: 1920 },
+      height: { min: 480, ideal: 720, max: 1080 },
+      advanced: [{ focusMode: "continuous" }]
+    }
+  };
+
+  console.log('Camera config:', cameraIdOrConfig);
+  console.log('Scanner config:', config);
+
+  try {
+    await html5QrCodeScanner.start(
+      cameraIdOrConfig,
+      config,
+      onScanSuccess,
+      onScanFailure
+    );
+
+    isScannerActive = true;
+    console.log('Scanner started successfully with camera:', cameraIdOrConfig);
+
+  } catch (err) {
+    console.error('Start scan failed:', err);
+    console.error('Error name:', err.name);
+    console.error('Error message:', err.message);
+
+    // Retry with environment if specific device failed
+    if (selectedValue !== 'environment') {
+      console.log('Retrying with environment camera...');
+      cameraSelect.value = 'environment';
+      setTimeout(() => startScanning(), 500);
+      return;
     }
 
-    // Display detected ISBN
-    document.getElementById('detectedIsbn').textContent = cleanCode;
-    document.getElementById('barcodeResult').style.display = 'block';
-
-    // Stop scanner after detection
-    stopBarcodeScanner();
-
-    // Search for book by ISBN
-    searchBookByISBN(cleanCode);
-  } else {
-    console.log('Invalid barcode length:', cleanCode.length, 'Code:', cleanCode);
+    throw err;
   }
+}
+
+async function stopScanning() {
+  console.log('stopScanning called, isScannerActive:', isScannerActive);
+  if (html5QrCodeScanner && isScannerActive) {
+    try {
+      console.log('Calling html5QrCodeScanner.stop()...');
+      await html5QrCodeScanner.stop();
+      isScannerActive = false;
+      console.log('Scanner stopped successfully');
+
+      // Clear the scanner instance to force recreation
+      // This ensures clean state when switching cameras
+      html5QrCodeScanner.clear();
+      console.log('Scanner cleared');
+    } catch (err) {
+      console.warn('Error stopping scanner:', err);
+      isScannerActive = false; // Reset flag even on error
+    }
+  } else {
+    console.log('Scanner not active or not initialized, nothing to stop');
+  }
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+  if (!isScannerActive) return;
+  if (decodedText.length !== 13) return; // Only accept 13-digit ISBN
+
+  console.log('✅ Barcode detected!');
+  console.log('Code:', decodedText);
+  console.log('Format:', decodedResult.result.format);
+
+  // Pause scanning
+  if (html5QrCodeScanner) {
+    html5QrCodeScanner.pause(true);
+  }
+
+  // Play beep sound
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.frequency.value = 800;
+    gainNode.gain.value = 0.3;
+    oscillator.start();
+    setTimeout(() => oscillator.stop(), 200);
+  } catch (e) {
+    console.warn('Could not play beep:', e);
+  }
+
+  // Show detected ISBN
+  document.getElementById('detectedIsbn').textContent = decodedText;
+  document.getElementById('barcodeResult').style.display = 'block';
+
+  // Search for book
+  searchBookByISBN(decodedText);
+}
+
+function onScanFailure(error) {
+  // Quiet failure - no barcode in this frame
 }
 
 async function searchBookByISBN(isbn) {
@@ -1525,29 +1599,14 @@ async function searchBookByISBN(isbn) {
   }
 }
 
-function stopBarcodeScanner() {
+async function stopBarcodeScanner() {
   console.log('Stopping barcode scanner...');
 
-  // Stop video stream
-  if (scannerStream) {
-    scannerStream.getTracks().forEach(track => {
-      track.stop();
-      console.log('Stopped camera track:', track.label);
-    });
-    scannerStream = null;
-  }
+  // Stop html5-qrcode scanner
+  await stopScanning();
 
-  // Clear video element
-  const video = document.getElementById('barcodeScannerVideo');
-  if (video) {
-    video.srcObject = null;
-  }
-
-  // Reset code reader
-  if (codeReader) {
-    codeReader.reset();
-    codeReader = null;
-  }
+  // Clear the scanner instance
+  html5QrCodeScanner = null;
 
   // Hide scanner
   const scannerDiv = document.getElementById('barcodeScanner');

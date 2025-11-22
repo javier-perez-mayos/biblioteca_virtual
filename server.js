@@ -412,6 +412,34 @@ app.get('/api/books/search-isbn/:isbn', requireAuth, async (req, res) => {
 /**
  * POST /api/books/upload - Upload book cover and recognize
  */
+// Barcode scanning endpoint
+app.post('/api/barcode/scan', requireAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No image uploaded' });
+    }
+
+    const { scanBarcodeFromImage } = require('./scan-isbn');
+    const result = await scanBarcodeFromImage(req.file.path);
+
+    // Clean up uploaded file
+    fs.unlinkSync(req.file.path);
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(400).json(result);
+    }
+
+  } catch (error) {
+    console.error('Barcode scan error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to scan barcode: ' + error.message
+    });
+  }
+});
+
 app.post('/api/books/upload', requireAuth, upload.single('cover'), async (req, res) => {
   try {
     if (!req.file) {

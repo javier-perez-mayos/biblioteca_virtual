@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Scanner Test</title>
+    <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+            background: #000;
+            border-radius: 5px;
+        }
+        canvas {
+            display: none;
+        }
+        .log {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log div {
+            margin: 2px 0;
+            padding: 2px 5px;
+        }
+        .log .error { color: red; }
+        .log .success { color: green; font-weight: bold; }
+        .log .info { color: blue; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            padding: 15px;
+            background: #e8f5e9;
+            border-left: 4px solid #4CAF50;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 Barcode Scanner Debug Test</h1>
+        <p>This page helps debug barcode detection issues.</p>
+
+        <div style="margin: 20px 0;">
+            <button id="startBtn">Start Camera</button>
+            <button id="stopBtn" disabled>Stop Camera</button>
+        </div>
+
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+
+        <div class="result" id="result">
+            <strong>✅ Barcode Detected!</strong><br>
+            Code: <span id="codeText"></span><br>
+            Format: <span id="formatText"></span>
+        </div>
+
+        <h3>Debug Log:</h3>
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const logDiv = document.getElementById('log');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const result = document.getElementById('result');
+
+        let codeReader = null;
+        let scanning = false;
+        let stream = null;
+        let scanCount = 0;
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                log('Initializing ZXing...', 'info');
+
+                if (typeof ZXing === 'undefined') {
+                    log('ERROR: ZXing library not loaded!', 'error');
+                    alert('ZXing library not loaded. Please refresh the page.');
+                    return;
+                }
+
+                codeReader = new ZXing.BrowserMultiFormatReader();
+                log('ZXing initialized successfully', 'success');
+
+                log('Requesting camera access...', 'info');
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+
+                log('Camera access granted', 'success');
+
+                video.srcObject = stream;
+
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        log(`Video metadata loaded: ${video.videoWidth}x${video.videoHeight}`, 'info');
+                        resolve();
+                    };
+                });
+
+                await video.play();
+                log('Video playing', 'success');
+
+                // Wait for stabilization
+                await new Promise(resolve => setTimeout(resolve, 500));
+                log('Video stabilized, starting scan loop...', 'info');
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                log(`Canvas size: ${canvas.width}x${canvas.height}`, 'info');
+
+                scanning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+
+                scanLoop();
+
+            } catch (error) {
+                log(`ERROR: ${error.message}`, 'error');
+                alert('Failed to start camera: ' + error.message);
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            scanning = false;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            video.srcObject = null;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            log('Camera stopped', 'info');
+        });
+
+        async function scanLoop() {
+            if (!scanning) return;
+
+            scanCount++;
+            if (scanCount % 10 === 0) {
+                log(`Scan attempt #${scanCount}...`, 'info');
+            }
+
+            try {
+                // Draw video frame for visual feedback
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Decode directly from video
+                const result = await codeReader.decodeFromVideoElement(video);
+
+                if (result) {
+                    const code = result.getText();
+                    const format = result.getBarcodeFormat();
+                    const formatName = ZXing.BarcodeFormat[format];
+
+                    log(`SUCCESS! Detected barcode: ${code}`, 'success');
+                    log(`Format: ${formatName} (${format})`, 'success');
+
+                    // Show result
+                    document.getElementById('codeText').textContent = code;
+                    document.getElementById('formatText').textContent = formatName;
+                    document.getElementById('result').classList.add('show');
+
+                    // Beep
+                    try {
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        oscillator.connect(audioContext.destination);
+                        oscillator.frequency.value = 800;
+                        oscillator.start();
+                        setTimeout(() => oscillator.stop(), 200);
+                    } catch (e) {}
+
+                    // Continue scanning for testing
+                    setTimeout(() => scanLoop(), 1000);
+                    return;
+                }
+            } catch (error) {
+                if (error.name !== 'NotFoundException') {
+                    log(`Decode error: ${error.message}`, 'error');
+                }
+            }
+
+            // Continue scanning
+            setTimeout(() => scanLoop(), 100);
+        }
+
+        // Log on page load
+        log('Page loaded. ZXing available: ' + (typeof ZXing !== 'undefined'), 'info');
+    </script>
+</body>
+</html>

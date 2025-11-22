@@ -460,6 +460,11 @@ body {
   100% { width: 100%; }
 }
 
+@keyframes scanLine {
+  0%, 100% { top: 0; }
+  50% { top: 100%; }
+}
+
 .progress-text {
   text-align: center;
   color: var(--text-secondary);

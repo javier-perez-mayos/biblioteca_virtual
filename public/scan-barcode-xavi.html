@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Escàner d'ISBN</title>
+    <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
+    <style>
+      #video {
+        width: 100%;
+        max-width: 400px;
+        border: 1px solid #ccc;
+        position: relative;
+      }
+      #result,
+      #book-info {
+        margin-top: 1rem;
+        font-family: sans-serif;
+      }
+      /* Overlay for Quagga canvas */
+      #video > canvas {
+        position: absolute !important;
+        top: 0;
+        left: 0;
+        width: 100% !important;
+        height: 100% !important;
+        pointer-events: none;
+        z-index: 2;
+      }
+      #video video {
+        width: 100% !important;
+        height: auto !important;
+        display: block;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Escaneja el codi de barres del llibre</h1>
+    <div id="video"></div>
+    <div id="result">Esperant escaneig...</div>
+    <div id="book-info"></div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        Quagga.init(
+          {
+            inputStream: {
+              name: "Live",
+              type: "LiveStream",
+              target: document.querySelector("#video"),
+              constraints: {
+                facingMode: "environment", // Usa càmera posterior si està disponible
+              },
+            },
+            decoder: {
+              readers: ["ean_reader"], // Per a ISBN-13 (format EAN-13)
+            },
+          },
+          function (err) {
+            if (err) {
+              console.error(err);
+              return;
+            }
+            Quagga.start();
+          }
+        );
+
+        let lastScanned = null;
+        let scanningPaused = false;
+
+        Quagga.onProcessed(function (result) {
+          const drawingCtx = Quagga.canvas.ctx.overlay;
+          const drawingCanvas = Quagga.canvas.dom.overlay;
+          if (result) {
+            if (result.boxes) {
+              drawingCtx.clearRect(
+                0,
+                0,
+                drawingCanvas.width,
+                drawingCanvas.height
+              );
+              result.boxes
+                .filter(function (box) {
+                  return box !== result.box;
+                })
+                .forEach(function (box) {
+                  Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, {
+                    color: "green",
+                    lineWidth: 2,
+                  });
+                });
+            }
+            if (result.box) {
+              Quagga.ImageDebug.drawPath(
+                result.box,
+                { x: 0, y: 1 },
+                drawingCtx,
+                {
+                  color: "blue",
+                  lineWidth: 2,
+                }
+              );
+            }
+            if (result.codeResult && result.codeResult.code) {
+              Quagga.ImageDebug.drawPath(
+                result.line,
+                { x: "x", y: "y" },
+                drawingCtx,
+                {
+                  color: "red",
+                  lineWidth: 3,
+                }
+              );
+            }
+          }
+        });
+
+        Quagga.onDetected((data) => {
+          if (scanningPaused) return;
+          console.log("Barcode detected:", data);
+          const isbn = data.codeResult.code;
+
+          if (isbn === lastScanned) return; // evita escanejos duplicats
+          lastScanned = isbn;
+
+          // Mostrar el codi en pantalla de forma destacada
+          var codeDiv = document.getElementById("isbn-code");
+          if (!codeDiv) {
+            codeDiv = document.createElement("div");
+            codeDiv.id = "isbn-code";
+            codeDiv.style.fontSize = "2rem";
+            codeDiv.style.fontWeight = "bold";
+            codeDiv.style.margin = "1rem 0";
+            codeDiv.style.color = "#007bff";
+          }
+          codeDiv.innerText = `Codi: ${isbn}`;
+
+          // Actualitzar el resultat
+          var resultDiv = document.getElementById("result");
+          if (resultDiv) resultDiv.innerText = `ISBN detectat: ${isbn}`;
+
+          // Moure el bloc d'informació a la dreta del vídeo
+          var infoContainer = document.getElementById("info-container");
+          if (!infoContainer) {
+            infoContainer = document.createElement("div");
+            infoContainer.id = "info-container";
+            infoContainer.style.display = "flex";
+            infoContainer.style.flexDirection = "row";
+            infoContainer.style.alignItems = "flex-start";
+            infoContainer.style.gap = "2rem";
+            // Insert infoContainer after the h1
+            var h1 = document.querySelector("h1");
+            h1.parentNode.insertBefore(infoContainer, h1.nextSibling);
+            var videoDiv = document.getElementById("video");
+            infoContainer.appendChild(videoDiv);
+          }
+          // Remove previous info blocks if any
+          var oldInfoBlock = document.getElementById("info-block");
+          if (oldInfoBlock) oldInfoBlock.remove();
+          var infoBlock = document.createElement("div");
+          infoBlock.id = "info-block";
+          infoBlock.style.minWidth = "250px";
+          // Move #result and #isbn-code into infoBlock, but NOT #book-info
+          var bookInfoDiv = document.getElementById("book-info");
+          if (resultDiv) infoBlock.appendChild(resultDiv);
+          if (codeDiv) infoBlock.appendChild(codeDiv);
+          // Instead of moving, just append infoBlock and leave #book-info in the DOM
+          infoContainer.appendChild(infoBlock);
+
+          fetch(
+            `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
+          )
+            .then((res) => res.json())
+            .then((json) => {
+              const book = json[`ISBN:${isbn}`];
+              const bookInfoDiv = document.getElementById("book-info");
+
+              if (book) {
+                // Show all book info as a pretty JSON block and make it visually clear
+                bookInfoDiv.innerHTML = `
+                  <div style="background:#fffbe6;border:1px solid #ffe58f;padding:1em;margin-bottom:1em;border-radius:8px;">
+                    <h2 style="margin-top:0;">${book.title || ""}</h2>
+                    ${
+                      book.cover?.medium
+                        ? `<img src='${book.cover.medium}' alt='Portada del llibre' style='max-width:120px;max-height:180px;margin-left:1em;' />`
+                        : ""
+                    }
+                    <div style="clear:both"></div>
+                  </div>
+                  <div style="background:#f8f8f8;padding:1em;overflow:auto;font-size:0.9em;border-radius:6px;border:1px solid #eee;">
+                    <strong>Totes les dades del llibre:</strong>
+                    <pre style="margin:0;">${JSON.stringify(
+                      book,
+                      null,
+                      2
+                    )}</pre>
+                  </div>
+                `;
+                scanningPaused = true;
+                Quagga.stop(); // Deté l'escaneig només si s'ha trobat el llibre a l'API
+              } else {
+                bookInfoDiv.innerHTML = `<p>No s'ha trobat informació per a l'ISBN ${isbn}</p>`;
+              }
+            })
+            .catch((err) => {
+              document.getElementById(
+                "book-info"
+              ).innerHTML = `<p>Error en cercar el llibre: ${err.message}</p>`;
+            });
+        });
+      });
+    </script>
+  </body>
+</html>

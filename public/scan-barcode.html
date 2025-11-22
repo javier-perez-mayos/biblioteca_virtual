@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISBN-13 Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load html5-qrcode library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        /* Custom Pulse Animation */
+        @keyframes pulse-border {
+            0% { border-color: rgba(34, 197, 94, 0.5); box-shadow: 0 0 0 0px rgba(34, 197, 94, 0.2); }
+            50% { border-color: rgba(34, 197, 94, 1); box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2); }
+            100% { border-color: rgba(34, 197, 94, 0.5); box-shadow: 0 0 0 0px rgba(34, 197, 94, 0.2); }
+        }
+        .scanning-active .scan-overlay {
+            animation: pulse-border 2s infinite;
+            border-color: #22c55e;
+        }
+        #reader__dashboard_section_csr span { display: none !important; }
+        
+        /* Ensure video element fills space but maintains aspect ratio */
+        #reader {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+        #reader video {
+            object-fit: cover;
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="p-4 bg-gray-800 shadow-md z-10 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
+            <h1 class="text-lg font-bold tracking-wide">ISBN Scanner</h1>
+        </div>
+        <div id="scan-status" class="text-xs font-mono text-gray-400">Ready</div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 relative flex flex-col items-center justify-center bg-black w-full overflow-hidden">
+        
+        <div id="camera-container" class="relative w-full max-w-md mx-auto flex flex-col justify-center bg-black h-full">
+            
+            <!-- Scanner Div -->
+            <div id="reader" class="w-full h-full bg-black relative z-0"></div>
+
+            <!-- Debug Log -->
+            <div id="debug-log" class="absolute top-2 left-2 right-2 text-[10px] text-red-400 font-mono bg-black/50 p-1 hidden z-50 pointer-events-none break-all"></div>
+
+            <!-- Overlay -->
+            <div id="overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center hidden z-10">
+                <div class="scan-overlay w-72 h-48 border-2 border-white/50 rounded-lg relative bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                    <div class="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-green-500 -mt-1 -ml-1"></div>
+                    <div class="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-green-500 -mt-1 -mr-1"></div>
+                    <div class="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-green-500 -mb-1 -ml-1"></div>
+                    <div class="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-green-500 -mb-1 -mr-1"></div>
+                    <p class="absolute -top-8 w-full text-center text-white text-sm font-medium drop-shadow-md">Align Barcode Here</p>
+                </div>
+            </div>
+
+            <!-- Error Message Box -->
+            <div id="message-box" class="absolute inset-0 flex items-center justify-center bg-gray-900/90 z-20 p-6 text-center hidden">
+                <div>
+                    <div class="text-red-400 mb-2">
+                        <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">Camera Issue</h3>
+                    <p id="error-text" class="text-gray-300 text-sm mb-4">Unable to access camera.</p>
+                    <button onclick="location.reload()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Reload App</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Result Popup -->
+        <div id="result-popup" class="absolute bottom-0 left-0 right-0 bg-white text-gray-900 p-6 rounded-t-2xl transform translate-y-full transition-transform duration-300 ease-out z-30 shadow-2xl">
+            <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+            <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">ISBN-13 Detected</h2>
+            <div class="flex items-center justify-between gap-4">
+                <div id="isbn-result" class="text-2xl font-mono font-bold text-gray-900 break-all">...</div>
+                <button onclick="copyToClipboard()" class="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors" title="Copy">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                </button>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button onclick="restartScanning()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium transition-colors">Scan Next</button>
+                <a id="google-link" href="#" target="_blank" class="flex-1 border border-gray-300 text-center py-3 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors">Search</a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer / Controls -->
+    <footer class="bg-gray-800 p-4 shrink-0 z-20 border-t border-gray-700">
+        <div class="max-w-md mx-auto flex flex-col gap-3">
+            <div class="relative">
+                <select id="camera-select" class="w-full appearance-none bg-gray-700 border border-gray-600 text-white py-3 px-4 pr-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <option value="environment" selected>Default (Back Camera)</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                </div>
+            </div>
+            <button id="btn-start" onclick="startScanning()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all">
+                Start Camera
+            </button>
+            <button id="btn-stop" onclick="stopScanning()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all hidden">
+                Stop Camera
+            </button>
+        </div>
+    </footer>
+
+    <audio id="beep-sound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3" preload="auto"></audio>
+
+    <script>
+        const html5QrCode = new Html5Qrcode("reader");
+        const cameraSelect = document.getElementById('camera-select');
+        const overlay = document.getElementById('overlay');
+        const resultPopup = document.getElementById('result-popup');
+        const isbnResult = document.getElementById('isbn-result');
+        const scanStatus = document.getElementById('scan-status');
+        const btnStart = document.getElementById('btn-start');
+        const btnStop = document.getElementById('btn-stop');
+        const messageBox = document.getElementById('message-box');
+        const errorText = document.getElementById('error-text');
+        const debugLog = document.getElementById('debug-log');
+        const googleLink = document.getElementById('google-link');
+        
+        let isScanning = false;
+
+        function logDebug(msg) {
+            console.log(msg);
+            // Uncomment to see debug info on screen
+            // debugLog.innerText = msg;
+            // debugLog.classList.remove('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                if (devices && devices.length) {
+                    devices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.id;
+                        option.text = device.label || `Camera ${device.id.substr(0, 5)}...`;
+                        cameraSelect.appendChild(option);
+                    });
+                }
+            } catch (err) {
+                logDebug("Permission/Camera listing error: " + err);
+            }
+        });
+
+        cameraSelect.addEventListener('change', () => {
+            if (isScanning) {
+                stopScanning().then(() => startScanning());
+            }
+        });
+
+        function startScanning() {
+            hideResult();
+            messageBox.classList.add('hidden');
+            scanStatus.innerText = "Starting...";
+            
+            const selectedValue = cameraSelect.value;
+            
+            // 1. High Definition Constraints (Crucial for focus/clarity)
+            // We request 720p ideal, with a fallback for focus mode
+            let videoConstraints = {};
+            
+            if (selectedValue === 'environment') {
+                videoConstraints = { 
+                    facingMode: "environment",
+                    width: { min: 640, ideal: 1280, max: 1920 },
+                    height: { min: 480, ideal: 720, max: 1080 },
+                    advanced: [{ focusMode: "continuous" }] // Try to force autofocus
+                };
+            } else {
+                videoConstraints = { 
+                    deviceId: { exact: selectedValue },
+                    width: { min: 640, ideal: 1280, max: 1920 },
+                    height: { min: 480, ideal: 720, max: 1080 },
+                    advanced: [{ focusMode: "continuous" }]
+                };
+            }
+
+            // 2. Dynamic box configuration
+            const config = { 
+                fps: 10, 
+                // Calculate dynamic box based on screen width to avoid too small/large boxes
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    // wider box for ISBN
+                    const minEdgePercentage = 0.70; 
+                    const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                    const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+                    return {
+                        width: qrboxSize,
+                        height: Math.floor(qrboxSize * 0.6) // Rectangular for ISBN
+                    };
+                },
+                // Removed fixed aspectRatio to let video fill screen naturally
+                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13 ]
+            };
+
+            html5QrCode.start(
+                videoConstraints, 
+                config, 
+                onScanSuccess, 
+                onScanFailure
+            ).then(() => {
+                isScanning = true;
+                overlay.classList.remove('hidden');
+                document.body.classList.add('scanning-active');
+                btnStart.classList.add('hidden');
+                btnStop.classList.remove('hidden');
+                scanStatus.innerText = "Scanning...";
+                scanStatus.classList.add('text-green-400');
+                scanStatus.classList.remove('text-gray-400');
+            }).catch(err => {
+                console.error("Start failed", err);
+                logDebug("Start Error: " + err);
+                
+                if (selectedValue !== 'environment') {
+                    logDebug("Retry with environment...");
+                    cameraSelect.value = 'environment';
+                    setTimeout(startScanning, 500);
+                    return;
+                }
+                showError("Camera failed. " + err);
+            });
+        }
+
+        function stopScanning() {
+            return html5QrCode.stop().then(() => {
+                isScanning = false;
+                overlay.classList.add('hidden');
+                document.body.classList.remove('scanning-active');
+                btnStop.classList.add('hidden');
+                btnStart.classList.remove('hidden');
+                scanStatus.innerText = "Stopped";
+                scanStatus.classList.remove('text-green-400');
+                scanStatus.classList.add('text-gray-400');
+            }).catch(err => {});
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            if (!isScanning) return;
+            if (decodedText.length !== 13) return;
+
+            document.getElementById('beep-sound').play().catch(e => {});
+            html5QrCode.pause(true); 
+            
+            isbnResult.innerText = decodedText;
+            googleLink.href = `https://www.google.com/search?q=ISBN+${decodedText}`;
+            
+            resultPopup.classList.remove('translate-y-full');
+            scanStatus.innerText = "Detected!";
+        }
+
+        function onScanFailure(error) {
+            // quiet failure
+        }
+
+        function restartScanning() {
+            hideResult();
+            html5QrCode.resume();
+            scanStatus.innerText = "Scanning...";
+        }
+
+        function hideResult() {
+            resultPopup.classList.add('translate-y-full');
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(isbnResult.innerText);
+            const original = scanStatus.innerText;
+            scanStatus.innerText = "Copied!";
+            setTimeout(() => scanStatus.innerText = original, 1500);
+        }
+
+        function showError(msg) {
+            errorText.innerText = msg;
+            messageBox.classList.remove('hidden');
+            btnStart.classList.remove('hidden');
+            btnStop.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

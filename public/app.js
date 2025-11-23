@@ -1471,19 +1471,34 @@ async function searchBookByISBN(isbn) {
     if (result.success && result.data) {
       console.log('Book found:', result.data);
 
+      const bookData = result.data;
+
       // Fill form with book data
       currentCoverFile = null; // No cover file since we're using ISBN
-      populateBookForm(result.data);
+      document.getElementById('bookTitle').value = bookData.title || '';
+      document.getElementById('bookAuthor').value = bookData.author || '';
+      document.getElementById('bookISBN').value = bookData.isbn || '';
+      document.getElementById('bookPublisher').value = bookData.publisher || '';
+      document.getElementById('bookPublishedDate').value = bookData.published_date || '';
+      document.getElementById('bookDescription').value = bookData.description || '';
+      document.getElementById('bookPages').value = bookData.page_count || '';
+      document.getElementById('bookLanguage').value = bookData.language || '';
+      document.getElementById('bookCategories').value = bookData.categories || '';
+      document.getElementById('bookCoverImage').value = bookData.cover_image || '';
+      document.getElementById('bookThumbnail').value = bookData.thumbnail_image || '';
+      document.getElementById('bookGoogleId').value = bookData.google_books_id || '';
+
+      // Show preview
+      if (bookData.cover_image || bookData.thumbnail_image) {
+        document.getElementById('previewImage').src = bookData.cover_image || bookData.thumbnail_image;
+      }
 
       // Show details step
       document.getElementById('uploadStep').style.display = 'none';
       document.getElementById('detailsStep').style.display = 'block';
 
       // Show success message
-      const statusDiv = document.getElementById('recognitionStatus');
-      statusDiv.textContent = t('bookAdded');
-      statusDiv.className = 'status-message status-success';
-      statusDiv.style.display = 'block';
+      showRecognitionStatus(t('infoCompleted'), 'success');
     } else {
       alert(t('bookNotFound'));
       // Reset scanner

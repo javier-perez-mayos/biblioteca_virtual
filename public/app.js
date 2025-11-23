@@ -1312,11 +1312,10 @@ window.onclick = function(event) {
 };
 
 // === Barcode Scanner Functions ===
-let html5QrCodeScanner = null;
-let isScannerActive = false;
+let barcodeScanner = null;
 
 async function startBarcodeScanner() {
-  console.log('Starting barcode scanner with html5-qrcode...');
+  console.log('Starting barcode scanner with IsbnScannerService...');
 
   const scannerDiv = document.getElementById('barcodeScanner');
   const uploadArea = document.querySelector('.upload-area');
@@ -1336,7 +1335,7 @@ async function startBarcodeScanner() {
   }
 
   try {
-    console.log('Initializing html5-qrcode scanner...');
+    console.log('Initializing IsbnScannerService...');
 
     // Verify the scanner div exists
     const scannerElement = document.getElementById('barcodeScannerReader');
@@ -1345,10 +1344,10 @@ async function startBarcodeScanner() {
     }
     console.log('Scanner div found');
 
-    // Initialize scanner only if not already created
-    if (!html5QrCodeScanner) {
-      html5QrCodeScanner = new Html5Qrcode("barcodeScannerReader");
-      console.log('Html5Qrcode instance created');
+    // Initialize scanner service only if not already created
+    if (!barcodeScanner) {
+      barcodeScanner = new IsbnScannerService("barcodeScannerReader");
+      console.log('IsbnScannerService instance created');
     }
 
     // Populate camera selector
@@ -1396,16 +1395,19 @@ async function startBarcodeScanner() {
     // Add event listener for camera change
     cameraSelect.onchange = async () => {
       console.log('Camera selection changed to:', cameraSelect.value);
-      if (isScannerActive) {
+      if (barcodeScanner && barcodeScanner.isScanning) {
         console.log('Stopping current scanner...');
-        await stopScanning();
+        await barcodeScanner.stop();
         console.log('Starting scanner with new camera...');
-        await startScanning();
+        const selectedDeviceId = cameraSelect.value === 'environment' ? null : cameraSelect.value;
+        await barcodeScanner.start(onBarcodeScanned, selectedDeviceId);
       }
     };
 
-    // Start scanning
-    await startScanning();
+    // Start scanning with selected camera
+    const selectedDeviceId = cameraSelect.value === 'environment' ? null : cameraSelect.value;
+    await barcodeScanner.start(onBarcodeScanned, selectedDeviceId);
+    console.log('Scanner started successfully');
 
   } catch (error) {
     console.error('Error starting barcode scanner:', error);
@@ -1415,114 +1417,15 @@ async function startBarcodeScanner() {
 }
 
 
-async function startScanning() {
-  // Don't start if already active
-  if (isScannerActive) {
-    console.log('Scanner already active, stopping first...');
-    await stopScanning();
-  }
-
-  const cameraSelect = document.getElementById('cameraSelect');
-  const selectedValue = cameraSelect.value;
-
-  console.log('Starting scan with camera:', selectedValue);
-
-  // html5-qrcode expects either:
-  // - A camera ID string
-  // - OR a simple constraint object with ONE key: facingMode OR deviceId
-  let cameraIdOrConfig;
-
-  if (selectedValue === 'environment') {
-    cameraIdOrConfig = { facingMode: "environment" };
-  } else {
-    cameraIdOrConfig = selectedValue; // Just the device ID string
-  }
-
-  // Scanner configuration with video constraints
-  const config = {
-    fps: 10,
-    qrbox: function(viewfinderWidth, viewfinderHeight) {
-      const minEdgePercentage = 0.70;
-      const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-      const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
-      return {
-        width: qrboxSize,
-        height: Math.floor(qrboxSize * 0.6) // Rectangular for ISBN barcodes
-      };
-    },
-    formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13 ],
-    videoConstraints: {
-      width: { min: 640, ideal: 1280, max: 1920 },
-      height: { min: 480, ideal: 720, max: 1080 },
-      advanced: [{ focusMode: "continuous" }]
-    }
-  };
-
-  console.log('Camera config:', cameraIdOrConfig);
-  console.log('Scanner config:', config);
-
-  try {
-    await html5QrCodeScanner.start(
-      cameraIdOrConfig,
-      config,
-      onScanSuccess,
-      onScanFailure
-    );
-
-    isScannerActive = true;
-    console.log('Scanner started successfully with camera:', cameraIdOrConfig);
-
-  } catch (err) {
-    console.error('Start scan failed:', err);
-    console.error('Error name:', err.name);
-    console.error('Error message:', err.message);
-
-    // Retry with environment if specific device failed
-    if (selectedValue !== 'environment') {
-      console.log('Retrying with environment camera...');
-      cameraSelect.value = 'environment';
-      setTimeout(() => startScanning(), 500);
-      return;
-    }
-
-    throw err;
-  }
-}
-
-async function stopScanning() {
-  console.log('stopScanning called, isScannerActive:', isScannerActive);
-  if (html5QrCodeScanner && isScannerActive) {
-    try {
-      console.log('Calling html5QrCodeScanner.stop()...');
-      await html5QrCodeScanner.stop();
-      isScannerActive = false;
-      console.log('Scanner stopped successfully');
-
-      // Clear the scanner instance to force recreation
-      // This ensures clean state when switching cameras
-      html5QrCodeScanner.clear();
-      console.log('Scanner cleared');
-    } catch (err) {
-      console.warn('Error stopping scanner:', err);
-      isScannerActive = false; // Reset flag even on error
-    }
-  } else {
-    console.log('Scanner not active or not initialized, nothing to stop');
-  }
-}
-
-function onScanSuccess(decodedText, decodedResult) {
-  if (!isScannerActive) return;
+function onBarcodeScanned(decodedText) {
+  if (!barcodeScanner || !barcodeScanner.isScanning) return;
   if (decodedText.length !== 13) return; // Only accept 13-digit ISBN
 
   console.log('✅ Barcode detected!');
   console.log('Code:', decodedText);
-  console.log('Format:', decodedResult.result.format);
 
-  // Pause scanning
-  if (html5QrCodeScanner) {
-    html5QrCodeScanner.pause(true);
-  }
+  // Stop scanning
+  barcodeScanner.stop();
 
   // Play beep sound
   try {
@@ -1545,10 +1448,6 @@ function onScanSuccess(decodedText, decodedResult) {
 
   // Search for book
   searchBookByISBN(decodedText);
-}
-
-function onScanFailure(error) {
-  // Quiet failure - no barcode in this frame
 }
 
 async function searchBookByISBN(isbn) {
@@ -1602,11 +1501,13 @@ async function searchBookByISBN(isbn) {
 async function stopBarcodeScanner() {
   console.log('Stopping barcode scanner...');
 
-  // Stop html5-qrcode scanner
-  await stopScanning();
+  // Stop scanner service
+  if (barcodeScanner) {
+    await barcodeScanner.stop();
+  }
 
   // Clear the scanner instance
-  html5QrCodeScanner = null;
+  barcodeScanner = null;
 
   // Hide scanner
   const scannerDiv = document.getElementById('barcodeScanner');

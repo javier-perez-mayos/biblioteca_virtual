@@ -1186,11 +1186,9 @@ async function startBarcodeScanner() {
 
   const scannerDiv = document.getElementById('barcodeScanner');
   const uploadArea = document.querySelector('.upload-area');
-  const cameraPreview = document.getElementById('cameraPreview');
 
   // Hide other options
   uploadArea.style.display = 'none';
-  cameraPreview.style.display = 'none';
   scannerDiv.style.display = 'block';
 
   // Check if html5-qrcode is available

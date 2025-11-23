@@ -82,15 +82,20 @@ class BookRecognitionService {
       const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${
         this.googleBooksApiKey ? `&key=${this.googleBooksApiKey}` : ''
       }`;
-      console.log('Searching Google Books for ISBN:', isbn);
+      console.log('\n=== COVER SEARCH: Starting search for ISBN:', isbn, '===');
+      console.log('COVER SEARCH [Step 1]: Calling Google Books API');
+      console.log('COVER SEARCH [API Call]: GET', url);
 
       const response = await axios.get(url);
+      console.log('COVER SEARCH [API Response]: Google Books returned', response.data.items?.length || 0, 'items');
 
       if (response.data.items && response.data.items.length > 0) {
+        console.log('COVER SEARCH [Raw Response]:', JSON.stringify(response.data.items[0].volumeInfo?.imageLinks, null, 2));
+
         const bookData = this.formatBookData(response.data.items[0]);
 
-        console.log('Google Books returned cover_image:', bookData.cover_image);
-        console.log('Google Books returned thumbnail_image:', bookData.thumbnail_image);
+        console.log('COVER SEARCH [Formatted]: cover_image =', bookData.cover_image || '(empty)');
+        console.log('COVER SEARCH [Formatted]: thumbnail_image =', bookData.thumbnail_image || '(empty)');
 
         // Validate and fix cover images
         await this.validateAndFixCoverImages(bookData, isbn);
@@ -98,9 +103,10 @@ class BookRecognitionService {
         return bookData;
       }
 
+      console.log('COVER SEARCH: No items found in Google Books response');
       return null;
     } catch (error) {
-      console.error('Error searching by ISBN:', error.message);
+      console.error('COVER SEARCH [ERROR]: Google Books API failed:', error.message);
       return null;
     }
   }
@@ -113,20 +119,25 @@ class BookRecognitionService {
     let coverImage = bookData.cover_image || '';
     let thumbnailImage = bookData.thumbnail_image || '';
 
+    console.log('COVER SEARCH [Step 2]: Validating cover images from Google Books');
+    console.log('COVER SEARCH [Validation]: cover_image =', coverImage || '(empty)');
+    console.log('COVER SEARCH [Validation]: thumbnail_image =', thumbnailImage || '(empty)');
+
     // Ensure HTTPS
     if (coverImage) coverImage = coverImage.replace('http://', 'https://');
     if (thumbnailImage) thumbnailImage = thumbnailImage.replace('http://', 'https://');
 
     // Step 1: Check if Google Books provided valid images
     if (!coverImage && !thumbnailImage) {
-      console.log('Google Books has no cover images, trying alternative sources...');
+      console.log('COVER SEARCH [Decision]: No cover images from Google Books, proceeding to fallback chain');
       await this.applyCoverFallbackChain(bookData, isbn);
       return;
     }
 
     // Step 2: Validate the provided image URLs
     const primaryUrl = coverImage || thumbnailImage;
-    console.log('Validating primary cover URL:', primaryUrl);
+    console.log('COVER SEARCH [Validation]: Making HEAD request to validate image');
+    console.log('COVER SEARCH [API Call]: HEAD', primaryUrl);
 
     try {
       // Make a HEAD request to check image validity
@@ -134,11 +145,12 @@ class BookRecognitionService {
       const contentLength = parseInt(headResponse.headers['content-length'] || '0');
       const contentType = headResponse.headers['content-type'] || '';
 
-      console.log(`Image validation - Size: ${contentLength} bytes, Type: ${contentType}`);
+      console.log('COVER SEARCH [API Response]: Content-Length:', contentLength, 'bytes');
+      console.log('COVER SEARCH [API Response]: Content-Type:', contentType);
 
       // Check if it's too small (likely a placeholder)
       if (contentLength < 1000 || !contentType.startsWith('image/')) {
-        console.log('Primary cover is invalid (too small or wrong type), trying fallbacks...');
+        console.log('COVER SEARCH [Decision]: Image invalid (size < 1000 bytes or wrong type), trying fallbacks');
         await this.applyCoverFallbackChain(bookData, isbn);
         return;
       }
@@ -146,11 +158,11 @@ class BookRecognitionService {
       // If valid, ensure both fields are populated
       bookData.cover_image = coverImage || thumbnailImage;
       bookData.thumbnail_image = thumbnailImage || coverImage;
-      console.log('Primary cover validated successfully');
+      console.log('COVER SEARCH [Success]: Primary cover validated and accepted ✓');
 
     } catch (error) {
-      console.log('Primary cover validation failed:', error.message);
-      console.log('Trying fallback sources...');
+      console.log('COVER SEARCH [ERROR]: HEAD request failed:', error.message);
+      console.log('COVER SEARCH [Decision]: Proceeding to fallback chain');
       await this.applyCoverFallbackChain(bookData, isbn);
     }
   }
@@ -161,25 +173,30 @@ class BookRecognitionService {
    * 2. Google Images (if API configured)
    */
   async applyCoverFallbackChain(bookData, isbn) {
+    console.log('COVER SEARCH [Step 3]: Starting fallback chain');
+
     // Try OpenLibrary first
+    console.log('COVER SEARCH [Step 3a]: Trying OpenLibrary');
     const openLibraryCover = await this.getCoverImageFromAlternativeSources(isbn);
     if (openLibraryCover) {
       bookData.cover_image = openLibraryCover;
       bookData.thumbnail_image = openLibraryCover;
-      console.log('Using OpenLibrary cover:', openLibraryCover);
+      console.log('COVER SEARCH [Success]: Using OpenLibrary cover ✓');
       return;
     }
 
     // Try Google Images as last resort (if API is configured)
+    console.log('COVER SEARCH [Step 3b]: Trying Google Custom Search API');
     const googleImagesCover = await this.searchCoverViaGoogleImages(bookData);
     if (googleImagesCover) {
       bookData.cover_image = googleImagesCover;
       bookData.thumbnail_image = googleImagesCover;
-      console.log('Using Google Images cover:', googleImagesCover);
+      console.log('COVER SEARCH [Success]: Using Google Images cover ✓');
       return;
     }
 
-    console.log('All cover fallback methods exhausted, no valid cover found');
+    console.log('COVER SEARCH [Final]: All methods exhausted, no valid cover found');
+    console.log('COVER SEARCH [Final]: Setting needsManualCoverSearch flag');
     // Mark that we need manual search
     bookData.needsManualCoverSearch = true;
   }
@@ -193,30 +210,41 @@ class BookRecognitionService {
       const apiKey = process.env.GOOGLE_API_KEY;
       const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
 
+      console.log('COVER SEARCH [Google Images]: Checking API configuration');
+      console.log('COVER SEARCH [Google Images]: API Key configured?', !!apiKey);
+      console.log('COVER SEARCH [Google Images]: Search Engine ID configured?', !!searchEngineId);
+
       if (!apiKey || !searchEngineId) {
-        console.log('Google Custom Search API not configured, skipping Google Images search');
+        console.log('COVER SEARCH [Google Images]: API not configured, skipping');
         return null;
       }
 
       const query = `${bookData.title} ${bookData.author} book cover`;
-      console.log('Searching Google Images for:', query);
+      console.log('COVER SEARCH [Google Images]: Search query:', query);
 
       const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&searchType=image&num=5&imgSize=medium&safe=active`;
+      console.log('COVER SEARCH [API Call]: GET', searchUrl.replace(apiKey, 'REDACTED'));
 
       const response = await axios.get(searchUrl, { timeout: 10000 });
+      console.log('COVER SEARCH [API Response]: Found', response.data.items?.length || 0, 'results');
 
       if (response.data.items && response.data.items.length > 0) {
+        console.log('COVER SEARCH [Google Images]: Validating each result...');
+
         // Try each result until we find a valid one
-        for (const item of response.data.items) {
+        for (let i = 0; i < response.data.items.length; i++) {
+          const item = response.data.items[i];
           const imageUrl = item.link;
+
+          console.log(`COVER SEARCH [Google Images]: Result ${i + 1}/${response.data.items.length}:`, imageUrl);
 
           // Skip OpenLibrary URLs (we already tried those)
           if (imageUrl.includes('covers.openlibrary.org')) {
-            console.log('Skipping OpenLibrary result from Google Images');
+            console.log('COVER SEARCH [Google Images]: Skipping (OpenLibrary URL)');
             continue;
           }
 
-          console.log('Validating Google Images result:', imageUrl);
+          console.log('COVER SEARCH [API Call]: HEAD', imageUrl);
 
           // Validate the image
           try {
@@ -224,26 +252,29 @@ class BookRecognitionService {
             const contentLength = parseInt(headResponse.headers['content-length'] || '0');
             const contentType = headResponse.headers['content-type'] || '';
 
+            console.log('COVER SEARCH [API Response]: Content-Length:', contentLength, 'bytes');
+            console.log('COVER SEARCH [API Response]: Content-Type:', contentType);
+
             if (contentLength > 1000 && contentType.startsWith('image/')) {
-              console.log(`Valid image found: ${contentLength} bytes, ${contentType}`);
+              console.log('COVER SEARCH [Google Images]: Valid image found ✓');
               return imageUrl;
             } else {
-              console.log(`Image too small or invalid type: ${contentLength} bytes, ${contentType}`);
+              console.log('COVER SEARCH [Google Images]: Rejected (too small or wrong type)');
             }
           } catch (validationError) {
-            console.log('Image validation failed:', validationError.message);
+            console.log('COVER SEARCH [Google Images ERROR]:', validationError.message);
             continue;
           }
         }
 
-        console.log('No valid images found in Google Images results');
+        console.log('COVER SEARCH [Google Images]: No valid images in results');
       } else {
-        console.log('No Google Images results found');
+        console.log('COVER SEARCH [Google Images]: No results returned by API');
       }
 
       return null;
     } catch (error) {
-      console.error('Error searching Google Images:', error.message);
+      console.error('COVER SEARCH [Google Images ERROR]:', error.message);
       return null;
     }
   }
@@ -256,20 +287,28 @@ class BookRecognitionService {
     // Try OpenLibrary - but we need to verify it's not a placeholder
     const olCover = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
 
+    console.log('COVER SEARCH [OpenLibrary]: Checking cover availability');
+    console.log('COVER SEARCH [API Call]: HEAD', olCover);
+
     try {
       // Make a HEAD request to check if the image exists
       const response = await axios.head(olCover);
 
+      console.log('COVER SEARCH [API Response]: Status', response.status);
+      console.log('COVER SEARCH [API Response]: Headers:', JSON.stringify(response.headers, null, 2));
+
       // Check Content-Length - if it's tiny (< 1000 bytes), it's likely a placeholder
       const contentLength = parseInt(response.headers['content-length'] || '0');
+      console.log('COVER SEARCH [OpenLibrary]: Content-Length:', contentLength, 'bytes');
+
       if (contentLength > 1000) {
-        console.log(`OpenLibrary cover found (${contentLength} bytes)`);
+        console.log('COVER SEARCH [OpenLibrary]: Valid cover found (> 1000 bytes) ✓');
         return olCover;
       } else {
-        console.log(`OpenLibrary returned placeholder (${contentLength} bytes), skipping`);
+        console.log('COVER SEARCH [OpenLibrary]: Rejected - placeholder image (< 1000 bytes)');
       }
     } catch (error) {
-      console.log('OpenLibrary cover not available:', error.message);
+      console.log('COVER SEARCH [OpenLibrary ERROR]:', error.message);
     }
 
     return null;

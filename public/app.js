@@ -1608,7 +1608,7 @@ async function searchBookByISBN(isbn) {
   }
 }
 
-function showCoverFallback(bookData, container, imageElement) {
+async function showCoverFallback(bookData, container, imageElement) {
   // Hide the broken image
   imageElement.style.display = 'none';
 
@@ -1616,11 +1616,7 @@ function showCoverFallback(bookData, container, imageElement) {
   const existingFallback = container.querySelector('.cover-fallback');
   if (existingFallback) existingFallback.remove();
 
-  // Create Google Images search query
-  const searchQuery = encodeURIComponent(`${bookData.title} ${bookData.author} book cover`);
-  const googleImagesUrl = `https://www.google.com/search?tbm=isch&q=${searchQuery}`;
-
-  // Create fallback message with link
+  // Create fallback container
   const fallbackDiv = document.createElement('div');
   fallbackDiv.className = 'cover-fallback';
   fallbackDiv.style.cssText = `
@@ -1631,6 +1627,77 @@ function showCoverFallback(bookData, container, imageElement) {
     border-radius: 8px;
     margin: 1rem 0;
   `;
+
+  // Show loading state
+  fallbackDiv.innerHTML = `
+    <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+    <p style="margin-bottom: 1rem; color: #666;">
+      <strong>${t('searchingCover') || 'Searching for cover image...'}</strong>
+    </p>
+  `;
+  container.appendChild(fallbackDiv);
+
+  // Try to fetch first Google Images result
+  const searchQuery = `${bookData.title} ${bookData.author} book cover`;
+  console.log('Searching Google Images for:', searchQuery);
+
+  try {
+    const response = await fetch(`${API_BASE}/books/search-cover-image`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        query: searchQuery,
+        title: bookData.title,
+        author: bookData.author,
+        isbn: bookData.isbn
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.success && result.imageUrl) {
+      console.log('Found cover image from Google Images:', result.imageUrl);
+
+      // Try to load the found image
+      const testImg = new Image();
+      testImg.onload = function() {
+        // Check if it's a valid size
+        if (this.naturalWidth > 50 && this.naturalHeight > 50) {
+          console.log('Google Images result is valid, using it');
+          // Update the original image element
+          imageElement.src = result.imageUrl;
+          imageElement.style.display = 'block';
+          fallbackDiv.remove();
+
+          // Update the form fields with the new cover URL
+          document.getElementById('bookCoverImage').value = result.imageUrl;
+          document.getElementById('bookThumbnail').value = result.imageUrl;
+        } else {
+          console.log('Google Images result too small, showing manual search');
+          showManualSearchFallback(bookData, fallbackDiv);
+        }
+      };
+      testImg.onerror = function() {
+        console.log('Google Images result failed to load, showing manual search');
+        showManualSearchFallback(bookData, fallbackDiv);
+      };
+      testImg.src = result.imageUrl;
+    } else {
+      console.log('No image found from Google Images, showing manual search');
+      showManualSearchFallback(bookData, fallbackDiv);
+    }
+  } catch (error) {
+    console.error('Error fetching cover image:', error);
+    showManualSearchFallback(bookData, fallbackDiv);
+  }
+}
+
+function showManualSearchFallback(bookData, fallbackDiv) {
+  const searchQuery = encodeURIComponent(`${bookData.title} ${bookData.author} book cover`);
+  const googleImagesUrl = `https://www.google.com/search?tbm=isch&q=${searchQuery}`;
 
   fallbackDiv.innerHTML = `
     <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
@@ -1651,8 +1718,6 @@ function showCoverFallback(bookData, container, imageElement) {
       ${t('coverNotRequired') || 'You can still save the book without a cover'}
     </p>
   `;
-
-  container.appendChild(fallbackDiv);
 }
 
 async function stopBarcodeScanner() {

@@ -410,6 +410,54 @@ app.get('/api/books/search-isbn/:isbn', requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /api/books/search-cover-image - Search for book cover image using Google Images
+ */
+app.post('/api/books/search-cover-image', requireAuth, async (req, res) => {
+  try {
+    const { query, title, author, isbn } = req.body;
+    console.log('Searching for cover image:', query);
+
+    // Use SerpAPI or similar service to get Google Images results
+    // For now, we'll use a simple approach with Google Custom Search API
+    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_API_KEY || ''}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID || ''}&q=${encodeURIComponent(query)}&searchType=image&num=1&imgSize=medium`;
+
+    try {
+      const response = await axios.get(searchUrl);
+
+      if (response.data && response.data.items && response.data.items.length > 0) {
+        const firstImage = response.data.items[0];
+        console.log('Found image:', firstImage.link);
+
+        res.json({
+          success: true,
+          imageUrl: firstImage.link,
+          thumbnail: firstImage.image.thumbnailLink
+        });
+      } else {
+        res.json({ success: false, error: 'No images found' });
+      }
+    } catch (apiError) {
+      console.warn('Google Custom Search API error:', apiError.message);
+
+      // Fallback: construct a likely image URL from OpenLibrary or other sources
+      if (isbn) {
+        const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+        res.json({
+          success: true,
+          imageUrl: openLibraryUrl,
+          fallback: true
+        });
+      } else {
+        res.json({ success: false, error: 'API not configured and no ISBN available' });
+      }
+    }
+  } catch (error) {
+    console.error('Error searching for cover image:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * POST /api/books/upload - Upload book cover and recognize
  */
 // Barcode scanning endpoint

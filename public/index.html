@@ -129,26 +129,15 @@
           <button class="close-btn" onclick="closeAddBookModal()">&times;</button>
         </div>
         <div class="modal-body">
-          <!-- Step 1: Upload Cover or Manual Entry -->
+          <!-- Step 1: Choose Entry Method -->
           <div id="uploadStep" class="form-step">
             <h3 data-i18n="addBook">Afegir Llibre</h3>
             <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;" data-i18n="chooseOption">
               Tria una opció per afegir el teu llibre
             </p>
             <div class="upload-area">
-              <input type="file" id="coverInput" accept="image/*" style="display: none;" />
-              <button id="takePictureBtn" class="btn-secondary" data-i18n="takePictureCover">📷 Fer Foto de la Portada</button>
-              <button id="uploadFileBtn" class="btn-secondary" data-i18n="uploadFileCover">📁 Pujar Imatge de Portada</button>
               <button id="scanBarcodeBtn" class="btn-secondary" data-i18n="scanBarcode">🔍 Escanejar Codi de Barres</button>
               <button id="manualEntryBtn" class="btn-secondary" data-i18n="manualEntry">✍️ Entrada Manual</button>
-            </div>
-            <div id="cameraPreview" style="display: none;">
-              <video id="cameraVideo" autoplay playsinline></video>
-              <canvas id="cameraCanvas" style="display: none;"></canvas>
-              <div class="camera-controls">
-                <button id="captureBtn" class="btn-primary" data-i18n="capture">📸 Capturar</button>
-                <button id="cancelCameraBtn" class="btn-secondary" data-i18n="cancel">Cancel·lar</button>
-              </div>
             </div>
             <div id="barcodeScanner" style="display: none;">
               <p style="text-align: center; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 500;" data-i18n="pointCameraAtBarcode">Apunta la càmera al codi de barres ISBN</p>

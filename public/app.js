@@ -1,6 +1,5 @@
 // Global state
 let currentBooks = [];
-let cameraStream = null;
 let currentUser = null;
 
 // API Base URL
@@ -65,15 +64,8 @@ function initializeEventListeners() {
     addBookBtn.addEventListener('click', openAddBookModal);
   }
 
-  document.getElementById('takePictureBtn').addEventListener('click', startCamera);
-  document.getElementById('uploadFileBtn').addEventListener('click', () => {
-    document.getElementById('coverInput').click();
-  });
   document.getElementById('scanBarcodeBtn').addEventListener('click', startBarcodeScanner);
   document.getElementById('manualEntryBtn').addEventListener('click', showManualEntryForm);
-  document.getElementById('coverInput').addEventListener('change', handleFileUpload);
-  document.getElementById('captureBtn').addEventListener('click', capturePhoto);
-  document.getElementById('cancelCameraBtn').addEventListener('click', stopCamera);
   document.getElementById('cancelBarcodeBtn').addEventListener('click', stopBarcodeScanner);
   document.getElementById('autoCompleteBtn').addEventListener('click', autoCompleteBookData);
 
@@ -798,7 +790,6 @@ function openAddBookModal() {
 function closeAddBookModal() {
   const modal = document.getElementById('addBookModal');
   modal.classList.remove('active');
-  stopCamera();
   resetAddBookForm();
 }
 
@@ -806,38 +797,7 @@ function resetAddBookForm() {
   document.getElementById('uploadStep').style.display = 'block';
   document.getElementById('detailsStep').style.display = 'none';
   document.getElementById('uploadProgress').style.display = 'none';
-  document.getElementById('cameraPreview').style.display = 'none';
   document.getElementById('bookForm').reset();
-  document.getElementById('coverInput').value = '';
-}
-
-// Camera functionality
-async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    });
-
-    cameraStream = stream;
-    const video = document.getElementById('cameraVideo');
-    video.srcObject = stream;
-
-    document.getElementById('cameraPreview').style.display = 'block';
-    document.querySelector('.upload-area').style.display = 'none';
-  } catch (error) {
-    console.error('Error accessing camera:', error);
-    alert(t('cameraError'));
-  }
-}
-
-function stopCamera() {
-  if (cameraStream) {
-    cameraStream.getTracks().forEach(track => track.stop());
-    cameraStream = null;
-  }
-
-  document.getElementById('cameraPreview').style.display = 'none';
-  document.querySelector('.upload-area').style.display = 'flex';
 }
 
 // Manual entry functionality
@@ -870,99 +830,6 @@ function showManualEntryForm() {
   document.querySelector('.form-preview').style.display = 'none';
 }
 
-function capturePhoto() {
-  const video = document.getElementById('cameraVideo');
-  const canvas = document.getElementById('cameraCanvas');
-  const context = canvas.getContext('2d');
-
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  context.drawImage(video, 0, 0);
-
-  canvas.toBlob((blob) => {
-    const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
-    uploadImage(file);
-  }, 'image/jpeg', 0.9);
-
-  stopCamera();
-}
-
-// File upload
-function handleFileUpload(event) {
-  const file = event.target.files[0];
-  if (file) {
-    uploadImage(file);
-  }
-}
-
-async function uploadImage(file) {
-  try {
-    document.getElementById('uploadStep').style.display = 'block';
-    document.getElementById('uploadProgress').style.display = 'block';
-
-    const formData = new FormData();
-    formData.append('cover', file);
-
-    const response = await fetch(`${API_BASE}/books/upload`, {
-      method: 'POST',
-      body: formData
-    });
-
-    const result = await response.json();
-
-    document.getElementById('uploadProgress').style.display = 'none';
-
-    if (result.success) {
-      showBookDetailsForm(result);
-    } else if (response.status === 409) {
-      // Book already exists
-      showRecognitionStatus(t('bookAlreadyExists'), 'error');
-      setTimeout(() => {
-        closeAddBookModal();
-      }, 2000);
-    } else {
-      showError(t('errorUploading') + ': ' + result.error);
-    }
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    document.getElementById('uploadProgress').style.display = 'none';
-    showError(t('connectionError'));
-  }
-}
-
-// Show book details form
-function showBookDetailsForm(result) {
-  document.getElementById('uploadStep').style.display = 'none';
-  document.getElementById('detailsStep').style.display = 'block';
-
-  const bookData = result.data;
-
-  // Show recognition status
-  if (result.recognized) {
-    showRecognitionStatus(t('infoCompleted'), 'success');
-  } else {
-    showRecognitionStatus(t('bookNotRecognized'), 'warning');
-  }
-
-  // Populate form
-  document.getElementById('bookTitle').value = bookData.title || '';
-  document.getElementById('bookAuthor').value = bookData.author || '';
-  document.getElementById('bookISBN').value = bookData.isbn || '';
-  document.getElementById('bookPublisher').value = bookData.publisher || '';
-  document.getElementById('bookPublishedDate').value = bookData.published_date || '';
-  document.getElementById('bookDescription').value = bookData.description || '';
-  document.getElementById('bookPages').value = bookData.page_count || '';
-  document.getElementById('bookLanguage').value = bookData.language || '';
-  document.getElementById('bookCategories').value = bookData.categories || '';
-  document.getElementById('bookCoverImage').value = bookData.cover_image || '';
-  document.getElementById('bookThumbnail').value = bookData.thumbnail_image || '';
-  document.getElementById('bookGoogleId').value = bookData.google_books_id || '';
-
-  // Show preview
-  if (bookData.cover_image || bookData.thumbnail_image) {
-    document.getElementById('previewImage').src = bookData.cover_image || bookData.thumbnail_image;
-  }
-}
 
 function showRecognitionStatus(message, type) {
   const statusDiv = document.getElementById('recognitionStatus');

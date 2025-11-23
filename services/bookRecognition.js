@@ -104,9 +104,76 @@ class BookRecognitionService {
       }
 
       console.log('COVER SEARCH: No items found in Google Books response');
-      return null;
+      console.log('COVER SEARCH [Fallback]: Trying OpenLibrary for book metadata');
+      return await this.searchOpenLibrary(isbn);
     } catch (error) {
       console.error('COVER SEARCH [ERROR]: Google Books API failed:', error.message);
+      console.log('COVER SEARCH [Fallback]: Trying OpenLibrary for book metadata');
+      return await this.searchOpenLibrary(isbn);
+    }
+  }
+
+  /**
+   * Search OpenLibrary for book metadata by ISBN
+   * Used as fallback when Google Books fails
+   */
+  async searchOpenLibrary(isbn) {
+    try {
+      const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&jscmd=data&format=json`;
+      console.log('COVER SEARCH [OpenLibrary Metadata]: Calling OpenLibrary API');
+      console.log('COVER SEARCH [API Call]: GET', url);
+
+      const response = await axios.get(url);
+      console.log('COVER SEARCH [API Response]:', JSON.stringify(response.data, null, 2));
+
+      const key = `ISBN:${isbn}`;
+      const bookInfo = response.data[key];
+
+      if (!bookInfo) {
+        console.log('COVER SEARCH [OpenLibrary Metadata]: No book found');
+        return null;
+      }
+
+      // Format OpenLibrary data to match our schema
+      const bookData = {
+        title: bookInfo.title || '',
+        author: bookInfo.authors ? bookInfo.authors.map(a => a.name).join(', ') : '',
+        isbn: isbn,
+        publisher: bookInfo.publishers ? bookInfo.publishers[0]?.name || '' : '',
+        published_date: bookInfo.publish_date || '',
+        description: bookInfo.notes || '',
+        page_count: bookInfo.number_of_pages || '',
+        language: '',
+        categories: bookInfo.subjects ? bookInfo.subjects.map(s => s.name).join(', ') : '',
+        cover_image: bookInfo.cover?.large || bookInfo.cover?.medium || '',
+        thumbnail_image: bookInfo.cover?.small || bookInfo.cover?.medium || '',
+        google_books_id: '',
+        source: 'openlibrary'
+      };
+
+      console.log('COVER SEARCH [OpenLibrary Metadata]: Book found:', bookData.title);
+      console.log('COVER SEARCH [OpenLibrary Metadata]: cover_image =', bookData.cover_image || '(empty)');
+
+      // Ensure HTTPS for cover images
+      if (bookData.cover_image) {
+        bookData.cover_image = bookData.cover_image.replace('http://', 'https://');
+      }
+      if (bookData.thumbnail_image) {
+        bookData.thumbnail_image = bookData.thumbnail_image.replace('http://', 'https://');
+      }
+
+      // If no cover from metadata API, try the direct cover endpoint
+      if (!bookData.cover_image && !bookData.thumbnail_image) {
+        const directCover = await this.getCoverImageFromAlternativeSources(isbn);
+        if (directCover) {
+          bookData.cover_image = directCover;
+          bookData.thumbnail_image = directCover;
+        }
+      }
+
+      return bookData;
+    } catch (error) {
+      console.error('COVER SEARCH [OpenLibrary Metadata ERROR]:', error.message);
       return null;
     }
   }

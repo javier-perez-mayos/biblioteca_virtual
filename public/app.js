@@ -1484,13 +1484,47 @@ async function searchBookByISBN(isbn) {
       document.getElementById('bookPages').value = bookData.page_count || '';
       document.getElementById('bookLanguage').value = bookData.language || '';
       document.getElementById('bookCategories').value = bookData.categories || '';
-      document.getElementById('bookCoverImage').value = bookData.cover_image || '';
-      document.getElementById('bookThumbnail').value = bookData.thumbnail_image || '';
+
+      // Use OpenLibrary cover as fallback if Google Books doesn't have one
+      let coverImage = bookData.cover_image || '';
+      let thumbnailImage = bookData.thumbnail_image || '';
+
+      if ((!coverImage || !thumbnailImage) && bookData.isbn) {
+        // Try OpenLibrary cover
+        const openLibraryCover = `https://covers.openlibrary.org/b/isbn/${bookData.isbn}-L.jpg`;
+        if (!coverImage) coverImage = openLibraryCover;
+        if (!thumbnailImage) thumbnailImage = openLibraryCover;
+      }
+
+      // Ensure HTTPS for image URLs
+      if (coverImage) coverImage = coverImage.replace('http://', 'https://');
+      if (thumbnailImage) thumbnailImage = thumbnailImage.replace('http://', 'https://');
+
+      document.getElementById('bookCoverImage').value = coverImage;
+      document.getElementById('bookThumbnail').value = thumbnailImage;
       document.getElementById('bookGoogleId').value = bookData.google_books_id || '';
 
       // Show preview
-      if (bookData.cover_image || bookData.thumbnail_image) {
-        document.getElementById('previewImage').src = bookData.cover_image || bookData.thumbnail_image;
+      const previewImage = document.getElementById('previewImage');
+      if (coverImage || thumbnailImage) {
+        previewImage.src = coverImage || thumbnailImage;
+        previewImage.style.display = 'block';
+
+        // Handle image load errors with fallback
+        previewImage.onerror = function() {
+          if (bookData.isbn) {
+            // Try OpenLibrary as ultimate fallback
+            this.src = `https://covers.openlibrary.org/b/isbn/${bookData.isbn}-L.jpg`;
+            this.onerror = function() {
+              // If still fails, hide the image
+              this.style.display = 'none';
+            };
+          } else {
+            this.style.display = 'none';
+          }
+        };
+      } else {
+        previewImage.style.display = 'none';
       }
 
       // Show details step

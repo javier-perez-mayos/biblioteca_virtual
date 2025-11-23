@@ -82,7 +82,20 @@ class BookRecognitionService {
       const response = await axios.get(url);
 
       if (response.data.items && response.data.items.length > 0) {
-        return this.formatBookData(response.data.items[0]);
+        const bookData = this.formatBookData(response.data.items[0]);
+
+        // If Google Books doesn't have cover images, try to get them from other sources
+        if (!bookData.cover_image && !bookData.thumbnail_image) {
+          console.log('Google Books has no cover images, trying alternative sources...');
+          const altCover = await this.getCoverImageFromAlternativeSources(isbn);
+          if (altCover) {
+            bookData.cover_image = altCover;
+            bookData.thumbnail_image = altCover;
+            console.log('Found cover from alternative source:', altCover);
+          }
+        }
+
+        return bookData;
       }
 
       return null;
@@ -90,6 +103,33 @@ class BookRecognitionService {
       console.error('Error searching by ISBN:', error.message);
       return null;
     }
+  }
+
+  /**
+   * Get cover image from alternative sources (OpenLibrary, etc)
+   * Note: We check if the image is valid (not a 1x1 placeholder)
+   */
+  async getCoverImageFromAlternativeSources(isbn) {
+    // Try OpenLibrary - but we need to verify it's not a placeholder
+    const olCover = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+
+    try {
+      // Make a HEAD request to check if the image exists
+      const response = await axios.head(olCover);
+
+      // Check Content-Length - if it's tiny (< 1000 bytes), it's likely a placeholder
+      const contentLength = parseInt(response.headers['content-length'] || '0');
+      if (contentLength > 1000) {
+        console.log(`OpenLibrary cover found (${contentLength} bytes)`);
+        return olCover;
+      } else {
+        console.log(`OpenLibrary returned placeholder (${contentLength} bytes), skipping`);
+      }
+    } catch (error) {
+      console.log('OpenLibrary cover not available:', error.message);
+    }
+
+    return null;
   }
 
   /**

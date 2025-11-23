@@ -80,6 +80,7 @@ export class IsbnScannerService {
         try {
             const response = await fetch(olUrl);
             const data = await response.json();
+            console.log("OpenLibrary response:", data);
             const key = `ISBN:${isbn}`;
             if (data && data[key]) {
                 const book = data[key];
@@ -95,6 +96,8 @@ export class IsbnScannerService {
         try {
             const response = await fetch(gbUrl);
             const data = await response.json();
+            console.log("Google Books response:", data);
+
             if (data && Array.isArray(data.items) && data.items.length > 0) {
                 const volume = data.items[0].volumeInfo || {};
                 const mapped = {
@@ -123,6 +126,7 @@ export class IsbnScannerService {
      * @returns {Promise<string|null>} cover URL or null
      */
     async getCoverUrl(isbn) {
+        console.log("Fetching cover URL for ISBN:", isbn);
         // 1. OpenLibrary Cover (does not require API call for metadata)
         const olCover = `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
         try {
@@ -140,6 +144,7 @@ export class IsbnScannerService {
         try {
             const resp = await fetch(gbUrl);
             const data = await resp.json();
+            console.log("Google Books cover response:", data);
             if (data && Array.isArray(data.items) && data.items.length > 0) {
                 const imgLinks = data.items[0].volumeInfo?.imageLinks;
                 if (imgLinks) {

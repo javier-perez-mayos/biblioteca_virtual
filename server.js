@@ -417,43 +417,77 @@ app.post('/api/books/search-cover-image', requireAuth, async (req, res) => {
     const { query, title, author, isbn } = req.body;
     console.log('Searching for cover image:', query);
 
-    // Use SerpAPI or similar service to get Google Images results
-    // For now, we'll use a simple approach with Google Custom Search API
-    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${process.env.GOOGLE_API_KEY || ''}&cx=${process.env.GOOGLE_SEARCH_ENGINE_ID || ''}&q=${encodeURIComponent(query)}&searchType=image&num=1&imgSize=medium`;
+    // Check if Google Custom Search API is configured
+    const apiKey = process.env.GOOGLE_API_KEY;
+    const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
+
+    if (!apiKey || !searchEngineId) {
+      console.log('Google Custom Search API not configured');
+      // Return failure so frontend shows manual search button
+      return res.json({
+        success: false,
+        error: 'Google Custom Search API not configured. Please add GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID to .env file.',
+        needsManualSearch: true
+      });
+    }
 
     try {
+      const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&searchType=image&num=3&imgSize=medium&safe=active`;
+
+      console.log('Calling Google Custom Search API...');
       const response = await axios.get(searchUrl);
 
       if (response.data && response.data.items && response.data.items.length > 0) {
-        const firstImage = response.data.items[0];
-        console.log('Found image:', firstImage.link);
+        // Try each image until we find one that's not from OpenLibrary (which we already tried)
+        for (const item of response.data.items) {
+          // Skip OpenLibrary results as we already tried those
+          if (item.link.includes('covers.openlibrary.org')) {
+            console.log('Skipping OpenLibrary result:', item.link);
+            continue;
+          }
 
-        res.json({
-          success: true,
-          imageUrl: firstImage.link,
-          thumbnail: firstImage.image.thumbnailLink
+          console.log('Found valid image from Google:', item.link);
+          return res.json({
+            success: true,
+            imageUrl: item.link,
+            thumbnail: item.image?.thumbnailLink || item.link
+          });
+        }
+
+        // All results were OpenLibrary
+        console.log('All Google results were OpenLibrary, returning failure');
+        return res.json({
+          success: false,
+          error: 'Only OpenLibrary results found (already tried)',
+          needsManualSearch: true
         });
       } else {
-        res.json({ success: false, error: 'No images found' });
+        console.log('No images found in Google search');
+        return res.json({
+          success: false,
+          error: 'No images found',
+          needsManualSearch: true
+        });
       }
     } catch (apiError) {
-      console.warn('Google Custom Search API error:', apiError.message);
-
-      // Fallback: construct a likely image URL from OpenLibrary or other sources
-      if (isbn) {
-        const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
-        res.json({
-          success: true,
-          imageUrl: openLibraryUrl,
-          fallback: true
-        });
-      } else {
-        res.json({ success: false, error: 'API not configured and no ISBN available' });
+      console.error('Google Custom Search API error:', apiError.message);
+      if (apiError.response) {
+        console.error('API response:', apiError.response.data);
       }
+
+      return res.json({
+        success: false,
+        error: `Google API error: ${apiError.message}`,
+        needsManualSearch: true
+      });
     }
   } catch (error) {
     console.error('Error searching for cover image:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      needsManualSearch: true
+    });
   }
 });
 

@@ -72,28 +72,28 @@ class BookRecognitionService {
 
   /**
    * Search book by ISBN using Google Books API
+   * Now includes comprehensive error handling with fallback chain:
+   * 1. Google Books API (primary)
+   * 2. OpenLibrary covers (with size validation)
+   * 3. Google Images search (if configured)
    */
   async searchByISBN(isbn) {
     try {
       const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${
         this.googleBooksApiKey ? `&key=${this.googleBooksApiKey}` : ''
       }`;
+      console.log('Searching Google Books for ISBN:', isbn);
 
       const response = await axios.get(url);
 
       if (response.data.items && response.data.items.length > 0) {
         const bookData = this.formatBookData(response.data.items[0]);
 
-        // If Google Books doesn't have cover images, try to get them from other sources
-        if (!bookData.cover_image && !bookData.thumbnail_image) {
-          console.log('Google Books has no cover images, trying alternative sources...');
-          const altCover = await this.getCoverImageFromAlternativeSources(isbn);
-          if (altCover) {
-            bookData.cover_image = altCover;
-            bookData.thumbnail_image = altCover;
-            console.log('Found cover from alternative source:', altCover);
-          }
-        }
+        console.log('Google Books returned cover_image:', bookData.cover_image);
+        console.log('Google Books returned thumbnail_image:', bookData.thumbnail_image);
+
+        // Validate and fix cover images
+        await this.validateAndFixCoverImages(bookData, isbn);
 
         return bookData;
       }
@@ -101,6 +101,149 @@ class BookRecognitionService {
       return null;
     } catch (error) {
       console.error('Error searching by ISBN:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Validates cover images and applies fallback chain if needed
+   * Handles: empty URLs, small placeholders, invalid images
+   */
+  async validateAndFixCoverImages(bookData, isbn) {
+    let coverImage = bookData.cover_image || '';
+    let thumbnailImage = bookData.thumbnail_image || '';
+
+    // Ensure HTTPS
+    if (coverImage) coverImage = coverImage.replace('http://', 'https://');
+    if (thumbnailImage) thumbnailImage = thumbnailImage.replace('http://', 'https://');
+
+    // Step 1: Check if Google Books provided valid images
+    if (!coverImage && !thumbnailImage) {
+      console.log('Google Books has no cover images, trying alternative sources...');
+      await this.applyCoverFallbackChain(bookData, isbn);
+      return;
+    }
+
+    // Step 2: Validate the provided image URLs
+    const primaryUrl = coverImage || thumbnailImage;
+    console.log('Validating primary cover URL:', primaryUrl);
+
+    try {
+      // Make a HEAD request to check image validity
+      const headResponse = await axios.head(primaryUrl, { timeout: 5000 });
+      const contentLength = parseInt(headResponse.headers['content-length'] || '0');
+      const contentType = headResponse.headers['content-type'] || '';
+
+      console.log(`Image validation - Size: ${contentLength} bytes, Type: ${contentType}`);
+
+      // Check if it's too small (likely a placeholder)
+      if (contentLength < 1000 || !contentType.startsWith('image/')) {
+        console.log('Primary cover is invalid (too small or wrong type), trying fallbacks...');
+        await this.applyCoverFallbackChain(bookData, isbn);
+        return;
+      }
+
+      // If valid, ensure both fields are populated
+      bookData.cover_image = coverImage || thumbnailImage;
+      bookData.thumbnail_image = thumbnailImage || coverImage;
+      console.log('Primary cover validated successfully');
+
+    } catch (error) {
+      console.log('Primary cover validation failed:', error.message);
+      console.log('Trying fallback sources...');
+      await this.applyCoverFallbackChain(bookData, isbn);
+    }
+  }
+
+  /**
+   * Apply fallback chain for cover images
+   * 1. OpenLibrary (with validation)
+   * 2. Google Images (if API configured)
+   */
+  async applyCoverFallbackChain(bookData, isbn) {
+    // Try OpenLibrary first
+    const openLibraryCover = await this.getCoverImageFromAlternativeSources(isbn);
+    if (openLibraryCover) {
+      bookData.cover_image = openLibraryCover;
+      bookData.thumbnail_image = openLibraryCover;
+      console.log('Using OpenLibrary cover:', openLibraryCover);
+      return;
+    }
+
+    // Try Google Images as last resort (if API is configured)
+    const googleImagesCover = await this.searchCoverViaGoogleImages(bookData);
+    if (googleImagesCover) {
+      bookData.cover_image = googleImagesCover;
+      bookData.thumbnail_image = googleImagesCover;
+      console.log('Using Google Images cover:', googleImagesCover);
+      return;
+    }
+
+    console.log('All cover fallback methods exhausted, no valid cover found');
+    // Mark that we need manual search
+    bookData.needsManualCoverSearch = true;
+  }
+
+  /**
+   * Search for book cover using Google Custom Search API
+   * Returns null if API not configured or no results found
+   */
+  async searchCoverViaGoogleImages(bookData) {
+    try {
+      const apiKey = process.env.GOOGLE_API_KEY;
+      const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
+
+      if (!apiKey || !searchEngineId) {
+        console.log('Google Custom Search API not configured, skipping Google Images search');
+        return null;
+      }
+
+      const query = `${bookData.title} ${bookData.author} book cover`;
+      console.log('Searching Google Images for:', query);
+
+      const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${searchEngineId}&q=${encodeURIComponent(query)}&searchType=image&num=5&imgSize=medium&safe=active`;
+
+      const response = await axios.get(searchUrl, { timeout: 10000 });
+
+      if (response.data.items && response.data.items.length > 0) {
+        // Try each result until we find a valid one
+        for (const item of response.data.items) {
+          const imageUrl = item.link;
+
+          // Skip OpenLibrary URLs (we already tried those)
+          if (imageUrl.includes('covers.openlibrary.org')) {
+            console.log('Skipping OpenLibrary result from Google Images');
+            continue;
+          }
+
+          console.log('Validating Google Images result:', imageUrl);
+
+          // Validate the image
+          try {
+            const headResponse = await axios.head(imageUrl, { timeout: 5000 });
+            const contentLength = parseInt(headResponse.headers['content-length'] || '0');
+            const contentType = headResponse.headers['content-type'] || '';
+
+            if (contentLength > 1000 && contentType.startsWith('image/')) {
+              console.log(`Valid image found: ${contentLength} bytes, ${contentType}`);
+              return imageUrl;
+            } else {
+              console.log(`Image too small or invalid type: ${contentLength} bytes, ${contentType}`);
+            }
+          } catch (validationError) {
+            console.log('Image validation failed:', validationError.message);
+            continue;
+          }
+        }
+
+        console.log('No valid images found in Google Images results');
+      } else {
+        console.log('No Google Images results found');
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error searching Google Images:', error.message);
       return null;
     }
   }

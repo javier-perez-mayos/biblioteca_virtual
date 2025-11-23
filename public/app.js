@@ -1471,10 +1471,11 @@ async function searchBookByISBN(isbn) {
     if (result.success && result.data) {
       console.log('Book found:', result.data);
 
-      const bookData = result.data;
+      try {
+        const bookData = result.data;
 
-      // Fill form with book data
-      currentCoverFile = null; // No cover file since we're using ISBN
+        // Fill form with book data
+        currentCoverFile = null; // No cover file since we're using ISBN
       document.getElementById('bookTitle').value = bookData.title || '';
       document.getElementById('bookAuthor').value = bookData.author || '';
       document.getElementById('bookISBN').value = bookData.isbn || '';
@@ -1485,20 +1486,17 @@ async function searchBookByISBN(isbn) {
       document.getElementById('bookLanguage').value = bookData.language || '';
       document.getElementById('bookCategories').value = bookData.categories || '';
 
-      // Use OpenLibrary cover as fallback if Google Books doesn't have one
+      // Get cover images from Google Books (primary source)
       let coverImage = bookData.cover_image || '';
       let thumbnailImage = bookData.thumbnail_image || '';
-
-      if ((!coverImage || !thumbnailImage) && bookData.isbn) {
-        // Try OpenLibrary cover
-        const openLibraryCover = `https://covers.openlibrary.org/b/isbn/${bookData.isbn}-L.jpg`;
-        if (!coverImage) coverImage = openLibraryCover;
-        if (!thumbnailImage) thumbnailImage = openLibraryCover;
-      }
 
       // Ensure HTTPS for image URLs
       if (coverImage) coverImage = coverImage.replace('http://', 'https://');
       if (thumbnailImage) thumbnailImage = thumbnailImage.replace('http://', 'https://');
+
+      // Note: We don't pre-populate with OpenLibrary here because it often returns
+      // 1x1 placeholder images. Instead, we'll try OpenLibrary as a fallback in the
+      // onerror handler if Google Books fails.
 
       document.getElementById('bookCoverImage').value = coverImage;
       document.getElementById('bookThumbnail').value = thumbnailImage;
@@ -1506,33 +1504,96 @@ async function searchBookByISBN(isbn) {
 
       // Show preview
       const previewImage = document.getElementById('previewImage');
+
+      console.log('Cover image URL:', coverImage);
+      console.log('Thumbnail image URL:', thumbnailImage);
+      console.log('Preview image element:', previewImage);
+
+      if (!previewImage) {
+        console.error('Preview image element not found!');
+        // Continue without preview
+        document.getElementById('uploadStep').style.display = 'none';
+        document.getElementById('detailsStep').style.display = 'block';
+        showRecognitionStatus(t('infoCompleted'), 'success');
+        return;
+      }
+
+      const previewContainer = previewImage.parentElement;
+      console.log('Preview container:', previewContainer);
+
       if (coverImage || thumbnailImage) {
-        previewImage.src = coverImage || thumbnailImage;
+        const imageUrl = coverImage || thumbnailImage;
+        console.log('Attempting to load image:', imageUrl);
+
+        // Remove any existing fallback message
+        const existingFallback = previewContainer.querySelector('.cover-fallback');
+        if (existingFallback) existingFallback.remove();
+
+        previewImage.src = imageUrl;
         previewImage.style.display = 'block';
 
         // Handle image load errors with fallback
         previewImage.onerror = function() {
+          console.log('Image failed to load:', this.src);
           if (bookData.isbn) {
             // Try OpenLibrary as ultimate fallback
-            this.src = `https://covers.openlibrary.org/b/isbn/${bookData.isbn}-L.jpg`;
+            const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${bookData.isbn}-L.jpg`;
+            console.log('Trying OpenLibrary fallback:', openLibraryUrl);
+            this.src = openLibraryUrl;
             this.onerror = function() {
-              // If still fails, hide the image
-              this.style.display = 'none';
+              console.log('OpenLibrary also failed, showing Google Images fallback');
+              // If still fails, show Google Images search option
+              showCoverFallback(bookData, previewContainer, this);
             };
           } else {
-            this.style.display = 'none';
+            // No ISBN, show Google Images search option
+            console.log('No ISBN, showing Google Images fallback');
+            showCoverFallback(bookData, previewContainer, this);
+          }
+        };
+
+        // Also handle successful load - but check if it's a valid image
+        previewImage.onload = function() {
+          console.log('Image loaded successfully:', this.src);
+          console.log('Image dimensions:', this.naturalWidth, 'x', this.naturalHeight);
+
+          // Check if it's a placeholder (1x1 or very small image)
+          if (this.naturalWidth <= 1 || this.naturalHeight <= 1 ||
+              (this.naturalWidth < 50 && this.naturalHeight < 50)) {
+            console.log('Image is too small (likely a placeholder), treating as failed');
+
+            // Check if this is already an OpenLibrary URL
+            if (this.src.includes('covers.openlibrary.org')) {
+              console.log('OpenLibrary returned placeholder, showing Google Images fallback');
+              showCoverFallback(bookData, previewContainer, this);
+            } else if (bookData.isbn) {
+              // Try OpenLibrary as fallback
+              const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${bookData.isbn}-L.jpg`;
+              console.log('Primary source returned placeholder, trying OpenLibrary:', openLibraryUrl);
+              this.src = openLibraryUrl;
+            } else {
+              // No ISBN to try OpenLibrary, show fallback
+              console.log('No ISBN available, showing Google Images fallback');
+              showCoverFallback(bookData, previewContainer, this);
+            }
           }
         };
       } else {
-        previewImage.style.display = 'none';
+        // No cover URL at all, show Google Images search option
+        console.log('No cover URL provided, showing Google Images fallback');
+        showCoverFallback(bookData, previewContainer, previewImage);
       }
 
-      // Show details step
-      document.getElementById('uploadStep').style.display = 'none';
-      document.getElementById('detailsStep').style.display = 'block';
+        // Show details step
+        document.getElementById('uploadStep').style.display = 'none';
+        document.getElementById('detailsStep').style.display = 'block';
 
-      // Show success message
-      showRecognitionStatus(t('infoCompleted'), 'success');
+        // Show success message
+        showRecognitionStatus(t('infoCompleted'), 'success');
+      } catch (innerError) {
+        console.error('Error processing book data:', innerError);
+        alert(t('errorOccurred') + ': ' + innerError.message);
+      }
     } else {
       alert(t('bookNotFound'));
       // Reset scanner
@@ -1545,6 +1606,53 @@ async function searchBookByISBN(isbn) {
     alert(t('errorOccurred'));
     document.getElementById('uploadProgress').style.display = 'none';
   }
+}
+
+function showCoverFallback(bookData, container, imageElement) {
+  // Hide the broken image
+  imageElement.style.display = 'none';
+
+  // Remove any existing fallback
+  const existingFallback = container.querySelector('.cover-fallback');
+  if (existingFallback) existingFallback.remove();
+
+  // Create Google Images search query
+  const searchQuery = encodeURIComponent(`${bookData.title} ${bookData.author} book cover`);
+  const googleImagesUrl = `https://www.google.com/search?tbm=isch&q=${searchQuery}`;
+
+  // Create fallback message with link
+  const fallbackDiv = document.createElement('div');
+  fallbackDiv.className = 'cover-fallback';
+  fallbackDiv.style.cssText = `
+    padding: 2rem;
+    text-align: center;
+    background: #f5f5f5;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    margin: 1rem 0;
+  `;
+
+  fallbackDiv.innerHTML = `
+    <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
+    <p style="margin-bottom: 1rem; color: #666;">
+      <strong>${t('noCoverAvailable') || 'No cover image available'}</strong>
+    </p>
+    <p style="margin-bottom: 1rem; font-size: 0.9rem; color: #888;">
+      ${t('searchCoverOnline') || 'You can search for the book cover online:'}
+    </p>
+    <a href="${googleImagesUrl}"
+       target="_blank"
+       style="display: inline-block; padding: 0.75rem 1.5rem; background: #4285f4; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: background 0.2s;"
+       onmouseover="this.style.background='#357ae8'"
+       onmouseout="this.style.background='#4285f4'">
+      🔍 ${t('searchGoogleImages') || 'Search on Google Images'}
+    </a>
+    <p style="margin-top: 1rem; font-size: 0.8rem; color: #999;">
+      ${t('coverNotRequired') || 'You can still save the book without a cover'}
+    </p>
+  `;
+
+  container.appendChild(fallbackDiv);
 }
 
 async function stopBarcodeScanner() {

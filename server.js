@@ -1186,10 +1186,25 @@ if (USE_SSL) {
   // Create HTTPS server
   const httpsServer = https.createServer(sslOptions, app);
 
-  httpsServer.listen(HTTPS_PORT, () => {
-    console.log(`\n🔒 Biblioteca Virtual HTTPS server running on https://localhost:${HTTPS_PORT}`);
+  httpsServer.listen(HTTPS_PORT, '0.0.0.0', () => {
+    const os = require('os');
+    const networkInterfaces = os.networkInterfaces();
+    let localIP = 'localhost';
+
+    // Find the first non-internal IPv4 address
+    Object.values(networkInterfaces).forEach(interfaces => {
+      interfaces.forEach(iface => {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          localIP = iface.address;
+        }
+      });
+    });
+
+    console.log(`\n🔒 Biblioteca Virtual HTTPS server running`);
+    console.log(`   Local:   https://localhost:${HTTPS_PORT}`);
+    console.log(`   Network: https://${localIP}:${HTTPS_PORT}`);
     console.log(`📚 API available at https://localhost:${HTTPS_PORT}/api`);
-    console.log(`🌐 Web interface at https://localhost:${HTTPS_PORT}\n`);
+    console.log(`🌐 Access from other devices: https://${localIP}:${HTTPS_PORT}\n`);
   });
 
   // Optionally also start HTTP server that redirects to HTTPS
@@ -1199,7 +1214,7 @@ if (USE_SSL) {
       res.redirect(301, `https://${req.headers.host.split(':')[0]}:${HTTPS_PORT}${req.url}`);
     });
 
-    httpApp.listen(PORT, () => {
+    httpApp.listen(PORT, '0.0.0.0', () => {
       console.log(`🔀 HTTP redirect server running on http://localhost:${PORT} → https://localhost:${HTTPS_PORT}\n`);
     });
   }
@@ -1207,10 +1222,25 @@ if (USE_SSL) {
   // Start HTTP server (default)
   const httpServer = http.createServer(app);
 
-  httpServer.listen(PORT, () => {
-    console.log(`\n🚀 Biblioteca Virtual server running on http://localhost:${PORT}`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    const os = require('os');
+    const networkInterfaces = os.networkInterfaces();
+    let localIP = 'localhost';
+
+    // Find the first non-internal IPv4 address
+    Object.values(networkInterfaces).forEach(interfaces => {
+      interfaces.forEach(iface => {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          localIP = iface.address;
+        }
+      });
+    });
+
+    console.log(`\n🚀 Biblioteca Virtual server running`);
+    console.log(`   Local:   http://localhost:${PORT}`);
+    console.log(`   Network: http://${localIP}:${PORT}`);
     console.log(`📚 API available at http://localhost:${PORT}/api`);
-    console.log(`🌐 Web interface at http://localhost:${PORT}\n`);
+    console.log(`🌐 Access from other devices: http://${localIP}:${PORT}\n`);
   });
 }
 
